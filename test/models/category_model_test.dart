@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hisabshare/Models/model.dart';
+import 'package:hisabshare/models/model.dart';
 
 void main() {
   group('CategoryModel.fromMap', () {

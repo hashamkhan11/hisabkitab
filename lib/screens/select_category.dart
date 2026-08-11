@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hisabshare/Models/add_category.dart';
-import 'package:hisabshare/Models/add_category_bottomsheet.dart';
+import 'package:hisabshare/widgets/add_category.dart';
+import 'package:hisabshare/widgets/add_category_bottomsheet.dart';
 
 class ChooseCategoryPage extends StatefulWidget {
   final String contactId;

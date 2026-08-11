@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../Models/model.dart';
+import '../models/model.dart';
 
 /// Centralizes Firestore access for `users/{uid}/categories`.
 /// Behavior ported as-is from the old `Category` class in Models/category.dart.

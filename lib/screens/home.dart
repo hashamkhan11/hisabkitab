@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:hisabshare/Models/add_category.dart';
-import 'package:hisabshare/Models/model.dart';
-import 'package:hisabshare/notifications.dart';
-import 'package:hisabshare/profile.dart';
+import 'package:hisabshare/widgets/add_category.dart';
+import 'package:hisabshare/models/model.dart';
+import 'package:hisabshare/screens/notifications.dart';
+import 'package:hisabshare/screens/profile.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hisabshare/widgets/hisaab.dart';

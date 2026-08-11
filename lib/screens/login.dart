@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hisabshare/Models/Forgot_password.dart';
-import 'package:hisabshare/signup.dart';
+import 'package:hisabshare/screens/forgot_password.dart';
+import 'package:hisabshare/screens/signup.dart';
 import 'package:hisabshare/screens/home.dart';
 
 class LoginScreen extends StatefulWidget {

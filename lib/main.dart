@@ -2,17 +2,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hisabshare/Models/add_category.dart';
-import 'package:hisabshare/Models/contact_detail.dart';
-import 'package:hisabshare/Models/model.dart';
-import 'package:hisabshare/login.dart';
-import 'package:hisabshare/notifications.dart';
-import 'package:hisabshare/profile.dart';
+import 'package:hisabshare/widgets/add_category.dart';
+import 'package:hisabshare/screens/contact_detail.dart';
+import 'package:hisabshare/models/model.dart';
+import 'package:hisabshare/screens/login.dart';
+import 'package:hisabshare/screens/notifications.dart';
+import 'package:hisabshare/screens/profile.dart';
 import 'package:hisabshare/screens/home.dart';
 import 'package:hisabshare/services/notification_service.dart';
 import 'package:hisabshare/services/push_notification_service.dart';
-import 'package:hisabshare/welcome.dart';
-import 'package:hisabshare/Models/contact_detail.dart';
+import 'package:hisabshare/screens/welcome.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

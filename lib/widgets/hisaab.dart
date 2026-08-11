@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:dotted_border/dotted_border.dart';
-import 'package:hisabshare/Models/add_category.dart';
+import 'package:hisabshare/widgets/add_category.dart';
 import 'package:hisabshare/screens/detail.dart';
-import 'package:hisabshare/Models/model.dart';
+import 'package:hisabshare/models/model.dart';
 import 'package:hisabshare/repositories/category_repository.dart';
 
 class Categories extends StatelessWidget {

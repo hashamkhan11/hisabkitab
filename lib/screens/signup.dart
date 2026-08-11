@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hisabshare/Models/privacy_policy_page.dart';
-import 'package:hisabshare/Models/terms_page.dart';
+import 'package:hisabshare/screens/privacy_policy_page.dart';
+import 'package:hisabshare/screens/terms_page.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
