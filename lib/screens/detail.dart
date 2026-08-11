@@ -72,7 +72,6 @@ void _listenToDynamicLinks() {
   FirebaseDynamicLinks.instance.onLink.listen((dynamicLinkData) {
     _navigateFromSharedLink(dynamicLinkData.link);
   }).onError((error) {
-    print('Dynamic link error: $error');
   });
 }
  
@@ -303,11 +302,8 @@ void _recalculateAllTransactions() async {
             .get();
 
         if (sharedSnapshot.docs.isNotEmpty) {
-          print(' sharedWith FOUND for contact: $contactId');
           final firstShared = sharedSnapshot.docs.first;
           final sharedData = firstShared.data();
-          print(' Receiver UID: ${firstShared.id}');
-  print('Receiver imageUrl: ${sharedData['imageUrl']}');
           sharedUser = {
             'uid': sharedData['uid'],
             'username': sharedData['name'] ?? '',
@@ -316,7 +312,6 @@ void _recalculateAllTransactions() async {
             'mobileNo': sharedData['mobileNo'] ?? '',
           };
         }else {
-  print(' sharedWith is empty for contact: $contactId');
 }
       }
      
@@ -553,8 +548,6 @@ void _recalculateAllTransactions() async {
                   Expanded(
                     child: GestureDetector(
     onTap: () async {
-      print("🧍 Full person data: $person");
-
       final isSharedView = person['isSharedView'] == true;
       final sharedUserId = person['sharedUserId'] ?? '';
       final sharedCategoryId = person['sharedCategoryId'];
@@ -577,27 +570,9 @@ void _recalculateAllTransactions() async {
 
         if (snap.exists) {
           receiverCategoryId = snap.data()?['categoryId'];
-          print(" Found receiverCategoryId: $receiverCategoryId");
         } else {
-          print(" sharedWith document not found!");
         }
       }
-
-      print(",,, isSharedView: $isSharedView");
-      print(",,, sharedUserId: $sharedUserId");
-      print(",,, Navigating to ContactDetailPage");
-      print(",,, contactId: $contactId");
-      print(",,, contactName: ${person['name']}");
-      print(",,, categoryId: $correctCategoryId");
-     print("==============  NAVIGATION DEBUG START ==============");
-print("A-- isSharedView       : $isSharedView");
-print("B-- sharedUserId       : $sharedUserId");
-print("C-- sharedCategoryId   : $sharedCategoryId");
-print("D-- correctCategoryId  : $correctCategoryId");
-print("E-- contactId (local)  : $contactId");
-print("F-- contactName        : ${person['name']}");
-print("G-- originalContactId  : ${person['originalContactId']}");
-print("==============  NAVIGATION DEBUG END   ==============");
 
       if (contactId != null && person['name'] != null) {
         await Navigator.push(
@@ -626,7 +601,6 @@ print("==============  NAVIGATION DEBUG END   ==============");
                             });
                           }
                         } else {
-                          print('Null contactId or contactName!');
                         }
                       },
                       child: Container(
@@ -677,15 +651,9 @@ print("==============  NAVIGATION DEBUG END   ==============");
 if (sharedUser != null)
   GestureDetector(
     onTap: () async {
-      print('Shared User: $sharedUser');
-
       if (sharedUser['contactId'] == null) {
-        print(' contactId is missing in sharedUser!');
       } else {
-        print(' contactId: ${sharedUser['contactId']}');
       }
-      print('Image URL: ${sharedUser['imageUrl']}');
-      print(' Opening bottom sheet for contactId: ${person['id']}');
 
 /*showDialog(
       context: context,
@@ -731,9 +699,6 @@ if (result == "removed") {
       GestureDetector(
         onTap: () {
           final sharedBy = person['sharedBy'];
-      print(" Showing sharedBy avatar for: ${person['name']}");
-      print(" sharedBy = $sharedBy");
-
           showDialog(
   context: context,
   builder: (BuildContext dialogContext) {

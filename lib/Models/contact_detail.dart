@@ -83,13 +83,6 @@ void initState() {
   sharedCategoryId = widget.sharedCategoryId;
   receiverCategoryId = widget.receiverCategoryId;
 
-  print('@@@ isSharedView: ${widget.isSharedView}');
-  print('@@@ sharedUserId: ${widget.sharedUserId}');
-  print('@@@ userId: $userId');
-  print('@@@ contactId: ${widget.contactId}');
-  print('@@@ categoryId: ${widget.categoryId}');
-  print('@@@ receiverCategoryId: ${widget.receiverCategoryId}');
-
   searchController.addListener(_filterTransactions);
 
   _scrollController.addListener(() {      // speed
@@ -138,8 +131,6 @@ void initState() {
 List<Map<String, dynamic>> sharedWithUsers = [];
 Future<void> _loadSharedWithUsers() async {
   try {
-    print("////// LoadShared With Users: ${widget.contactId}");
-
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
@@ -171,22 +162,14 @@ Future<void> _loadSharedWithUsers() async {
     setState(() {
       sharedWithUsers = enrichedUsers;
     });
-    print(" SharedWith Users Loaded:");
-    for (var user in sharedWithUsers) {
-      print(" ${user['username']} - Avatar: ${user['imageUrl']}");
-    }
-  } catch (e) {
-    print(' Error loading sharedWith users: $e');
+  } catch (_) {
   }
-} 
+}
 Future<bool> _loadSharedCategoryId() async {
-  print("////// Load Category using originalContactId: ${widget.originalContactId}");
-
   final sharedUid = widget.sharedUserId;
   final originalContactId = widget.originalContactId;
 
   if (sharedUid == null || sharedUid.isEmpty || originalContactId == null || originalContactId.isEmpty) {
-    print(" Invalid sharedUserId or originalContactId");
     return false;
   }
   try {
@@ -213,17 +196,13 @@ Future<bool> _loadSharedCategoryId() async {
           sharedCategoryId = category.id;
         });
 
-        print(" Shared Category Found: $sharedCategoryId");
-         print(" originalContactId to use: ${widget.originalContactId}");
         return true;
       }
     }
 
-    print("⚠ Contact not found in any category of shared user.");
     return false;
 
-  } catch (e) {
-    print(" Error loading shared category ID: $e");
+  } catch (_) {
     return false;
   }
 }
@@ -235,7 +214,6 @@ Future<void> _shareContactWithUser({
 }) async {
   try {
     if (receiverUid == senderUid) {
-      print(" Cannot share contact with yourself.");
       return;
     }
     // Get receiver user data
@@ -245,7 +223,6 @@ Future<void> _shareContactWithUser({
         .get();
     final receiverData = receiverDoc.data();
     if (receiverData == null) {
-      print(" Receiver user data not found.");
       return;
     }
     final sharedWithRef = FirebaseFirestore.instance
@@ -268,24 +245,18 @@ Future<void> _shareContactWithUser({
       'categoryId': categoryId,
       'contactId': contactId,
     }, SetOptions(merge: true));
- 
-    print(" Contact shared successfully with $receiverUid in sender’s sharedWith.");
-  } catch (e) {
-    print(" Error sharing contact: $e");
+  } catch (_) {
   }
 }
 Future<void> _loadAddTransactionPermission() async {
     final currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
     if (!widget.isSharedView || widget.sharedUserId == null || widget.originalContactId == null) {
-      print(" Not in shared view or missing info.");
       return;
     }
 
     final senderUserId = widget.sharedUserId!;
     final originalContactId = widget.originalContactId!;
-
-    print("👁 Fetching receiver category from sharedWith: users/$senderUserId/categories/${widget.sharedCategoryId}/contacts/$originalContactId/sharedWith/$currentUserId");
 
     try {
       final doc = await FirebaseFirestore.instance
@@ -305,8 +276,6 @@ Future<void> _loadAddTransactionPermission() async {
         final fetchedReceiverContactId = data?['receiverContactId'];
 
         if (fetchedReceiverCategoryId != null && fetchedReceiverContactId != null) {
-          print(" Receiver saved in category: $fetchedReceiverCategoryId");
-
           final contactDoc = await FirebaseFirestore.instance
               .collection('users')
               .doc(currentUserId)
@@ -324,33 +293,27 @@ Future<void> _loadAddTransactionPermission() async {
               receiverCategoryId = fetchedReceiverCategoryId;  //
               receiverContactId = fetchedReceiverContactId;    //
             });
-
-            print(" allowReceiverToAdd: $allow");
           }
         }
       }
-    } catch (e) {
-      print(" Error fetching shared contact permission: $e");
+    } catch (_) {
     }
   }
   Future<void> _fetchSenderNameAndPrompt() async {
  // if (_hasPrompted) return; ///// 5
  // _hasPrompted = true;   ////// 6
   try {
-    print(' Fetching sender name for UID: ${widget.sharedUserId}');
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
         .doc(widget.sharedUserId)
         .get();
- 
+
     final data = snapshot.data();
-    print(' Fetched Firestore data: $data');
- 
+
     final senderName = data != null && data['username'] != null
         ? data['username']
         : 'Someone';
-    print(' Sender name resolved to: $senderName');
- 
+
     final shouldAccept = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -370,14 +333,10 @@ Future<void> _loadAddTransactionPermission() async {
       ),
     );
     if (shouldAccept == true) {
-      print(' User accepted ledger from $senderName');
- 
       final receiverUid = FirebaseAuth.instance.currentUser!.uid;
       final senderUid = widget.sharedUserId!;
- 
-      //  ONLY create sharedWith doc in sender’s Firestore
-      print("////sharewith doc in senderFirestore: ${widget.contactId}");
 
+      //  ONLY create sharedWith doc in sender’s Firestore
       await _shareContactWithUser(
         senderUid: senderUid,
         receiverUid: receiverUid,
@@ -389,10 +348,8 @@ Future<void> _loadAddTransactionPermission() async {
         _showChooseCategoryBottomSheet(senderName);
       });
     } else {
-      print(' User declined the ledger.');
     }
-  } catch (e) {
-    print(' Error fetching sender name or showing prompt: $e');
+  } catch (_) {
   }
 }
 Future<void> _showChooseCategoryBottomSheet(String senderName) async {
@@ -406,8 +363,6 @@ Future<void> _showChooseCategoryBottomSheet(String senderName) async {
         .get();
 
     for (var cat in categoriesSnapshot.docs) {
-      print("/////ChooseCategory BottomSheet: ${widget.contactId}");
-
       final contactDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.sharedUserId)
@@ -446,7 +401,6 @@ Future<void> _showChooseCategoryBottomSheet(String senderName) async {
     final senderMobileNo = senderData['mobileNo'] ?? '';
     final senderImageUrl = senderData['imageUrl'] ?? '';
 
-    print("///// navigate to choosecat: ${widget.contactId}");
     //  Show bottom sheet
 
   final receiverContactId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -471,14 +425,10 @@ Future<void> _showChooseCategoryBottomSheet(String senderName) async {
       ),
     );
    if (result != null) {
-  print("Result from bottom sheet: $result");
   setState(() {
     this.receiverContactId = result['receiverContactId'];
     this.sharedCategoryId = result['sharedCategoryId'];
   });
-
-  print(" Contact accepted, reverse contact ID: $receiverContactId");
-  print(" Saved under shared category: $sharedCategoryId");
 
   if (result['ledgerSaved'] == true) {
 
@@ -520,8 +470,7 @@ GoRouter.of(context).go('/contact-detail', extra: {
 });
    }); */
 }
-  } catch (e) {
-    print("Error fetching contact data: $e");
+  } catch (_) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Error fetching contact data.")),
     );
@@ -599,7 +548,6 @@ Future<void> _refreshManually() async {
       return matchDate && matchSearch;
     }).toList();
   });
-  print("Filtered Transactions: ${filteredTransactions.length}");
 }
   Future<void> _pickDate() async {
     DateTime? date = await showDatePicker(
@@ -620,8 +568,6 @@ Future<void> _loadTransactions() async {
     setState(() {
       isLoading = true;
     });
-
-    print(" ///// load Transaction: ${widget.contactId}");
 
     final contactRef = widget.isSharedView
         ? FirebaseFirestore.instance
@@ -666,8 +612,7 @@ Future<void> _loadTransactions() async {
       isLoading = false;
       _filterTransactions();
     });
-  } catch (e) {
-    print("Error loading transactions: $e");
+  } catch (_) {
     setState(() {
       isLoading = false;
     });
@@ -739,13 +684,6 @@ Future<void> _loadTransactions() async {
     final actualCategoryId = widget.isSharedView ? widget.receiverCategoryId : widget.categoryId ?? '';
     final contactId = widget.contactId;
 
-    print("### Loading initial transactions...");
-   // print("### actualUserId=$actualUserId");
-    print("###userId=$uid");
-    print("### actualCategoryId=$actualCategoryId");
-    print("### contactId=$contactId");
-    print("### isSharedView=${widget.isSharedView}");
-
     try {
       Query query = FirebaseFirestore.instance
           .collection('users')
@@ -761,18 +699,14 @@ Future<void> _loadTransactions() async {
 
       final snapshot = await query.get();
 
-      print("### Snapshot docs count: ${snapshot.docs.length}");
-
       if (snapshot.docs.isNotEmpty) {
         lastDocument = snapshot.docs.last;
       } else {
-        print("### No transactions found for this contact!");
       }
 
       setState(() {
         allTransactions = snapshot.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          print("### Tx loaded => ${doc.id} | ${data['credit']} | ${data['type']}");
 
           return {
             'id': doc.id,
@@ -784,9 +718,7 @@ Future<void> _loadTransactions() async {
           };
         }).toList();
       });
-    } catch (e, st) {
-      print("Error loading initial transactions: $e");
-      print(st);
+    } catch (_) {
     }
   }
   Future<void> _loadMoreTransactions() async {
@@ -795,11 +727,6 @@ Future<void> _loadTransactions() async {
     final actualCategoryId = widget.isSharedView ? widget.receiverCategoryId : widget.categoryId ?? '';
     final contactId = widget.contactId;
     if (isLoadingMore || !hasMore) return;
-
-    print("Loading more transactions...");
-    print("---userId=$uid");
-    print("---actualCategoryId=$actualCategoryId");
-    print("---contactId=$contactId");
 
     setState(() => isLoadingMore = true);
 
@@ -815,18 +742,15 @@ Future<void> _loadTransactions() async {
         .limit(20);
 
     if (lastDocument != null) {
-      print(" Starting after last doc: ${lastDocument!.id}");
       query = query.startAfterDocument(lastDocument!);
     }
 
     final snapshot = await query.get();
-    print(" More docs fetched: ${snapshot.docs.length}");
 
     if (snapshot.docs.isNotEmpty) {
       setState(() {
         allTransactions.addAll(snapshot.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          print(" Appended transaction: ${doc.id} → ${data['note']}");
           return {
             'id': doc.id,
             'date': (data['date'] as Timestamp).toDate(),
@@ -838,14 +762,12 @@ Future<void> _loadTransactions() async {
         lastDocument = snapshot.docs.last;
       });
     } else {
-      print(" No more transactions found.");
       hasMore = false;
     }
 
     setState(() => isLoadingMore = false);
   }
   Stream<List<Map<String, dynamic>>> _getTransactionStream() {
-    print("Transaction called ");
     final String uid = userId;
     late final String categoryId;
     late final String contactId;
@@ -854,13 +776,11 @@ Future<void> _loadTransactions() async {
       categoryId = widget.categoryId;
       contactId = widget.contactId;
     } else {
-      print('~~~~~~~~~~~${widget.receiverCategoryId}');
       categoryId = widget.receiverCategoryId ?? '';
       contactId = receiverContactId ?? widget.originalContactId ?? '';
     }
 
     if (widget.isSharedView && (categoryId.isEmpty || contactId.isEmpty)) {
-      print(" Cannot build stream — required info missing");
       return const Stream.empty();
     }
 
@@ -873,7 +793,6 @@ Future<void> _loadTransactions() async {
   }
 
   Future<void> _addTransaction(Map<String, dynamic> transaction) async {
-    print(" Transaction Map Before Add: $transaction");
     try {
       final currentUserId = FirebaseAuth.instance.currentUser!.uid;
       final senderTxnRef = await TransactionService.createSenderTransaction(
@@ -904,10 +823,7 @@ Future<void> _loadTransactions() async {
       setState(() {
         transactionStream = _getTransactionStream();
       });
-
-      print(" Transaction process completed successfully.");
-    } catch (e) {
-      print(" Error adding transaction: $e");
+    } catch (_) {
     }
   }
   Future<void> _shareCsv() async {
@@ -1026,8 +942,6 @@ Future<void> _loadTransactions() async {
             icon: const Icon(Icons.picture_as_pdf),
           // onPressed: _generatePdfOnly,
          onPressed: () {
-  print(" PDF button clicked");
-
   final displayName = widget.isSharedView && currentUserName.isNotEmpty
       ? getReversedContactName(widget.contactName, currentUserName)
       : widget.contactName;
@@ -1042,7 +956,6 @@ Future<void> _loadTransactions() async {
         try {
           final image = await _screenshotController.capture();
           if (image == null) {
-            print("️ Screenshot is null.");
             return;
           }
           final directory = await getApplicationDocumentsDirectory();
@@ -1063,8 +976,7 @@ Future<void> _loadTransactions() async {
             text:
                 'Check out this contact\'s transactions: $shareableLink\n\nDownload our app: https://play.google.com/store/apps/details?id=com.ranksol.hisabshare',
           );
-        } catch (e) {
-          print("Share failed: $e");
+        } catch (_) {
         }
       },
     ),
@@ -1254,7 +1166,6 @@ Future<void> _loadTransactions() async {
 
               final arrow = isReceive ? '⬇️' : '⬆️';
               final color = isReceive ? Colors.green : Colors.red;
-              print("TX STATUS: ${tx['status']}");
              return Container(
   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
   decoration:  BoxDecoration(
@@ -1312,13 +1223,6 @@ Future<void> _loadTransactions() async {
           onTap: () async {
             final currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
-            print("DEBUG START ----------------");
-            print("currentUserId      : $currentUserId");
-            print("categoryId         : ${widget.categoryId}");
-            print("contactId          : ${widget.contactId}");
-            print("transactionId      : $transactionId");
-            print("--------------------------------");
-
            String existingNote = "";
             if (transactionId != null) {
               final noteDoc = await FirebaseFirestore.instance
@@ -1369,8 +1273,6 @@ Future<void> _loadTransactions() async {
                     ),
                     ElevatedButton(
                       onPressed: () async {
-                        print("Note when saving: $noteText");
-
                         if (noteText.isNotEmpty && transactionId != null) {
                           await FirebaseFirestore.instance
                               .collection('users')
@@ -1385,8 +1287,6 @@ Future<void> _loadTransactions() async {
                             "note": noteText,
                             "updatedAt": FieldValue.serverTimestamp(),
                           }, SetOptions(merge: true));
-
-                          print("Note saved ");
                         }
                         Navigator.pop(context);
                         setState(() {});

@@ -23,8 +23,6 @@ class _AddContactPageState extends State<AddContactPage> {
 
   void _submitTask() async {
   if (_formKey.currentState!.validate()) {
-    print("📝 Saving contact in categoryId: ${widget.categoryId}, categoryName: ${widget.categoryName}");
-
     final newContact = {
       'name': nameController.text.trim(),
       'mobileNo': mobileNoController.text.trim(),
@@ -50,7 +48,6 @@ class _AddContactPageState extends State<AddContactPage> {
              .doc();
 
         // Store contact info
-        print("📝 Contact data: $newContact");
        await contactDocRef.set(newContact);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Contact added successfully!')),

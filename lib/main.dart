@@ -39,7 +39,6 @@ class MyApp extends StatelessWidget {
     final contactId = state.pathParameters['contactId']!;
     final contactName = Uri.decodeComponent(state.pathParameters['contactName']!);
     final senderUserId = state.uri.queryParameters['senderId'];
-    print('GoRoute: senderUserId from URL = $senderUserId');
 
     return ContactDetailPage(
      categoryId: categoryId ?? '',

@@ -30,7 +30,6 @@ class PaymentService {
                 leading: const Icon(Icons.account_balance_wallet),
                 title: const Text("Easypaisa"),
                 onTap: () {
-                  print(" easypaisa tapped — txn: $txn");
                   Navigator.of(bottomSheetContext).pop("easypaisa");
                 },
               ),
@@ -39,7 +38,6 @@ class PaymentService {
                 leading: const Icon(Icons.mobile_friendly),
                 title: const Text("JazzCash"),
                 onTap: () {
-                  print(" JazzCash tapped — txn: $txn");
                   Navigator.of(bottomSheetContext).pop("jazzcash");
                 },
               ),
@@ -51,19 +49,14 @@ class PaymentService {
 
     //  After bottom sheet closes
     if (result == "jazzcash") {
-      print(" Launching JazzCash payment...");
       payViaJazzCash(context, txn);
     } else if (result == "easypaisa") {
-      print(" Launching Easypaisa payment...");
       payViaEasypaisa(context, txn);
     } else {
-      print(" No payment method selected or bottom sheet dismissed");
     }
   }
 
   static void payViaJazzCash(BuildContext context, Map<String, dynamic> txn) async {
-    print(" Inside _payViaJazzCash — txn: $txn");
-
     final amount = txn['credit'];
     final orderRef = "T${DateTime.now().millisecondsSinceEpoch}";
 
@@ -82,13 +75,6 @@ class PaymentService {
       return;
     }
     final uri = Uri.parse('https://us-central1-hisabkitab-b66b5.cloudfunctions.net/api/jazzcash/generateJazzCashLink');
-    print(" Attempting to POST to: $uri");
-    print(" Request body: ${{
-      "amount": amount.toString(),
-      "orderRef": orderRef,
-      "email": email,
-      "mobileNo": mobileNo,
-    }}");
     try {
       final response = await http.post(
         uri,
@@ -101,14 +87,9 @@ class PaymentService {
         }),
       );
 
-      print(" JazzCash API responded with status: ${response.statusCode}");
-      print(" Response body: ${response.body}");
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final paymentUrl = data['paymentUrl'];
-
-        print(" Launching payment URL: $paymentUrl");
 
         if (await canLaunchUrl(Uri.parse(paymentUrl))) {
           await launchUrl(Uri.parse(paymentUrl), mode: LaunchMode.externalApplication);
@@ -123,7 +104,6 @@ class PaymentService {
         );
       }
     } catch (e) {
-      print(" Error while sending request: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
@@ -131,8 +111,6 @@ class PaymentService {
   }
 
   static void payViaEasypaisa(BuildContext context, Map<String, dynamic> txn) async {
-    print(" Inside _payViaEasypaisa — txn: $txn");
-
     final amount = txn['credit'];
     final orderRef = "EP${DateTime.now().millisecondsSinceEpoch}";
 
@@ -152,13 +130,6 @@ class PaymentService {
     }
 
     final uri = Uri.parse('https://us-central1-hisabkitab-b66b5.cloudfunctions.net/api/easypaisa/generateEasypaisaLink');
-    print(" Attempting to POST to: $uri");
-    print(" Request body: ${{
-      "amount": amount.toString(),
-      "orderRef": orderRef,
-      "email": email,
-      "mobileNo": mobileNo,
-    }}");
 
     try {
       final response = await http.post(
@@ -172,14 +143,9 @@ class PaymentService {
         }),
       );
 
-      print(" Easypaisa API responded with status: ${response.statusCode}");
-      print(" Response body: ${response.body}");
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final paymentUrl = data['paymentUrl'];
-
-        print(" Launching Easypaisa payment URL: $paymentUrl");
 
         if (await canLaunchUrl(Uri.parse(paymentUrl))) {
           await launchUrl(Uri.parse(paymentUrl), mode: LaunchMode.externalApplication);
@@ -194,7 +160,6 @@ class PaymentService {
         );
       }
     } catch (e) {
-      print(" Error while sending Easypaisa request: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
@@ -262,20 +227,14 @@ class PaymentService {
       final data = jsonDecode(response.body);
       final inquiryData = data['response'];
 
-      print(" Inquiry Result: $inquiryData");
-
       if (inquiryData['pp_ResponseCode'] == '000') {
         //  Payment Successful
-        print(" Payment confirmed");
       } else if (inquiryData['pp_ResponseCode'] == '124') {
         //  Payment Failed
-        print(" Payment failed");
       } else {
         //  Pending or unknown
-        print(" Payment status: ${inquiryData['pp_ResponseMessage']}");
       }
     } else {
-      print(" HTTP Error: ${response.statusCode} - ${response.body}");
     }
   }
 }

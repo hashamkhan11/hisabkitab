@@ -46,7 +46,6 @@ class _ChooseCategoryPageState extends State<ChooseCategoryPage> {
  Future<void> _loadCategories() async {
   try {
     if (currentUserId == null || currentUserId!.isEmpty) {
-      print('currentUserId is null or empty');
       return;
     }
 
@@ -79,9 +78,7 @@ class _ChooseCategoryPageState extends State<ChooseCategoryPage> {
       categories = loaded;
       isLoading = false;
     });
-  } catch (e, stack) {
-    print('Error loading categories: $e');
-    print(stack);
+  } catch (_) {
   }
 }
 
@@ -277,7 +274,6 @@ class _ChooseCategoryPageState extends State<ChooseCategoryPage> {
       'ledgerSaved': true,
     });
   } catch (e) {
-    print(" Error saving shared contact: $e");
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Something went wrong: $e")),
     );

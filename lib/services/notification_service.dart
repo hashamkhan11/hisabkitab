@@ -34,6 +34,5 @@ class NotificationService {
 
   void _showInAppBanner({required String title, required String body}) {
     // Print or implement in-app animated banner logic here
-    print(" $title - $body"); // Replace this with banner widget if needed
   }
 }

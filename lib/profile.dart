@@ -53,8 +53,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
         });
       }
-    } catch (e) {
-      print("Error loading image/profile: $e");
+    } catch (_) {
     }
   }
 }
@@ -112,7 +111,6 @@ Future<void> _pickImage(ImageSource source) async {
       }
     } catch (e) {
       setState(() => _isUploading = false);
-      print("Upload Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: ${e.toString()}")),
       );
@@ -161,9 +159,7 @@ Future<void> sendEmailChangeVerification(String newEmail) async {
   if (user != null) {
     try {
       await user.verifyBeforeUpdateEmail(newEmail);
-      print('Verification email sent to $newEmail');
-    } on FirebaseAuthException catch (e) {
-      print('Error: ${e.code} - ${e.message}');
+    } on FirebaseAuthException catch (_) {
     }
   }
 }
@@ -240,8 +236,7 @@ Future<void> sendEmailChangeVerification(String newEmail) async {
   }
   shouldLogout = true;
 }
-    }catch(e){
-      print("Error : $e");
+    }catch(_){
     }
 
     if (newPassword.isNotEmpty) {

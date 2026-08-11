@@ -12,8 +12,6 @@ import 'package:share_plus/share_plus.dart';
 class StatementExportService {
   static Future<void> generateAndSavePdf(
       BuildContext context, List<Map<String, dynamic>> transactions, contactName) async {
-    print(" PDF called with ${transactions.length} transactions");
-
     if (transactions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("⚠ No transactions found to export.")),

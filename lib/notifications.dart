@@ -14,11 +14,7 @@ class NotificationPage extends StatelessWidget {
     final receiverId = FirebaseAuth.instance.currentUser!.uid;
 
     try {
-      print("===========  ACCEPT TRANSACTION START ===========");
-      print("Receiver UID: $receiverId");
-      print("transactionId: ${data['transactionId']}");
       if (data['transactionId'] == null || (data['transactionId'] as String).isEmpty) {
-        print(" Cannot accept transaction → transactionId is null/empty.");
         return; // function yahin se exit ho jayega
       }
       final String receiverCategoryId = data['receiverCategoryId'];
@@ -40,7 +36,6 @@ class NotificationPage extends StatelessWidget {
           .doc(data['transactionId']);
 
       await receiverTxnRef.update({'status': 'accepted'});
-      print(" Receiver transaction ${data['transactionId']} marked accepted");
 
       //  Update sender’s transaction status
       final senderTxnRef = FirebaseFirestore.instance
@@ -54,7 +49,6 @@ class NotificationPage extends StatelessWidget {
           .doc(senderTransactionId);
 
       await senderTxnRef.update({'status': 'accepted'});
-      print(" Sender transaction $senderTransactionId marked accepted");
 
       //  Update notification
       final notificationRef = FirebaseFirestore.instance
@@ -68,11 +62,7 @@ class NotificationPage extends StatelessWidget {
         'status': 'accepted',
         'resolvedAt': FieldValue.serverTimestamp(),
       });
-      print(" Notification $docId updated to accepted");
-
-      print("===========  ACCEPT TRANSACTION END ===========");
-    } catch (e) {
-      print(" Error accepting transaction: $e");
+    } catch (_) {
     }
   }
   Future<void> rejectTransaction(Map<String, dynamic> data) async {
@@ -82,17 +72,6 @@ class NotificationPage extends StatelessWidget {
       final senderId = data['senderId'];
       final senderCategoryId = data['senderCategoryId'];
       final senderContactId = data['senderContactId'];
-
-      print("------ DEBUG REJECT ------");
-      print("pendingId           : $pendingId");
-      print("senderTransactionId : $senderTransactionId");
-      print("senderId            : $senderId");
-      print("senderCategoryId    : $senderCategoryId");
-      print("senderContactId     : $senderContactId");
-
-      print("Trying to update path:");
-      print("users/${FirebaseAuth.instance.currentUser!.uid}/categories/${data['receiverCategoryId']}/contacts/${data['receiverContactId']}/pendingTransactions/$pendingId");
-
 
       // 1) Update pendingTransaction status → rejected
       await FirebaseFirestore.instance
@@ -122,10 +101,7 @@ class NotificationPage extends StatelessWidget {
             .update({'status': 'rejected'});
       }
 
-      print(" Transaction rejected successfully");
-
-    } catch (e) {
-      print(" Error rejecting transaction: $e");
+    } catch (_) {
     }
   }
 
@@ -235,31 +211,13 @@ class NotificationPage extends StatelessWidget {
                           children: [
                             TextButton(
                               onPressed: () async {
-                                print(" Accept button clicked");
-
                                 await acceptTransaction(data, docId);
-
-                                print(" Transaction accepted successfully");
                               },
                               child: const Text("Accept", style: TextStyle(color: Colors.black)),
                             ),
 
                             TextButton(
                               onPressed: () async {
-                                final pendingId = data['pendingTransactionId'];
-                                final senderTransactionId = data['senderTransactionId'];
-                                final senderId = data['senderId'];
-                                final senderCategoryId = data['senderCategoryId'];
-                                final senderContactId = data['senderContactId'];
-
-                                print("------ DEBUG TRANSACTION DATA ------");
-                                print("pendingId           : $pendingId");
-                                print("senderTransactionId : $senderTransactionId");
-                                print("senderId            : $senderId");
-                                print("senderCategoryId    : $senderCategoryId");
-                                print("senderContactId     : $senderContactId");
-                                print("-----------------------------------");
-
                                 //  only call rejectTransaction
                                 await rejectTransaction(data);
 

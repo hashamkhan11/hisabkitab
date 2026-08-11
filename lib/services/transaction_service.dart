@@ -7,11 +7,6 @@ class TransactionService {
     required String contactId,
     bool filterAccepted = false,
   }) {
-    print("   Building stream with:");
-    print("   UID: $uid");
-    print("   Category ID: $categoryId");
-    print("   Contact ID: $contactId");
-
     Query<Map<String, dynamic>> query = FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -22,7 +17,6 @@ class TransactionService {
         .collection('transactions');
 
     if (filterAccepted) {
-      print("query");
       query = query.where('status', isEqualTo: 'accepted');
     }
     return query
@@ -32,7 +26,6 @@ class TransactionService {
         .map((snapshot) {
       return snapshot.docs.map((doc) {
         final data = doc.data();
-        print("   Doc Fetched: ${doc.id} → $data");
 
         String finalType = data['type'] ?? '';
         if (filterAccepted) {
@@ -63,11 +56,6 @@ class TransactionService {
     String? receiverContactId,
     required Map<String, dynamic> transaction,
   }) async {
-    print(" Adding transaction for:");
-    print("User: $currentUserId");
-    print("Category: $categoryId");
-    print("Contact: $contactId");
-    print(" Note : ${transaction['note']}");
     // Add to Sender's Transactions
     final senderTxnRef = await FirebaseFirestore.instance
         .collection('users')
@@ -101,21 +89,8 @@ class TransactionService {
       'sharedCategoryId': categoryId,
       'status': 'pending',
     });
-    //  for Sender's Transaction
-    print(" Note added: ${transaction['note']}");
-    print(" Sender Transaction Created");
-    print("transactionId       : ()");
-    print("senderUserId        : $currentUserId");
-    print("senderCategoryId    : $categoryId");
-    print("senderContactId     : $contactId");
-    print("receiverUserId      : $sharedUserId");
-    print("receiverCategoryId  : $sharedCategoryId");
-    print("receiverContactId   : $receiverContactId");
-
     //  transactionId update
     await senderTxnRef.update({'transactionId': senderTxnRef.id});
-
-    print(" Sender transaction added: ${transaction['type']} Rs.${transaction['credit']}");
 
     return senderTxnRef;
   }
@@ -154,8 +129,6 @@ class TransactionService {
       final sharedUserId = doc['uid'];
       final sharedCategoryId = doc['categoryId']; //accept k lye
       final receiverContactId = doc['receiverContactId'];
-      print(" Sharing request with $sharedUserId in category $sharedCategoryId");
-      print(" Sender Note: ${transaction['note']}");
       //  Add to PENDING (receiver side)
       // Make a doc with ID first
       final pendingRef = FirebaseFirestore.instance
@@ -187,21 +160,8 @@ class TransactionService {
         'senderContactId': contactId,
       };
       await pendingRef.set(pendingData);
-      print(" Pending transaction created: ${pendingRef.id}");
-
-      //  Debug Print for Pending Transaction
-      print("Note being saved in PendingTransaction: ${transaction['note']}");
-      print("Pending Transaction Created for Receiver");
-      print("transactionId       : ${pendingRef.id}");
-      print("senderUserId        : $currentUserId");
-      print("sharedUserId        : $sharedUserId");
-      print("sharedCategoryId    : $sharedCategoryId");
-      print("receiverContactId   : $receiverContactId");
-      print("receiverCategoryId  : $sharedCategoryId");
-      print("note                : ${transaction['note']}");
 
       await pendingRef.update({'transactionId': pendingRef.id});
-      print(" Pending transaction created: ${pendingRef.id}");
 
       //  Add Notification (receiver side, senderName)
       String notificationBody;
@@ -235,8 +195,6 @@ class TransactionService {
         'senderContactId': contactId,
         'receiverCategoryId': sharedCategoryId,
       });
-      print(" Notification created with ID: ${pendingRef.id}");
-      print(" Notification sent to $sharedUserId");
     }
   }
 
