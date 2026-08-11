@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "hisabkitab-b66b5"
+  },
+  "targets": {
+    "hisabkitab-b66b5": {
+      "hosting": {
+        "hisabshare": [
+          "hisabshare"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

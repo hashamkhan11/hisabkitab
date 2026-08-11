@@ -1,0 +1,29 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "target": "hisabshare",
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      { "source": "/privacy_policy", "destination": "/privacy_policy.html" },
+      { "source": "/delete_account", "destination": "/delete_account.html" },
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}
