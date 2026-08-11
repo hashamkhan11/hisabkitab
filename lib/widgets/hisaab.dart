@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:hisabshare/Models/add_category.dart';
 import 'package:hisabshare/screens/detail.dart';
-import 'package:hisabshare/Models/category.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hisabshare/Models/model.dart';
+import 'package:hisabshare/repositories/category_repository.dart';
 
 class Categories extends StatelessWidget {
-  final List<Category> categoryList;
-  final void Function(Category) onAddCategory;
-  final void Function(Category) onDeleteCategory; //
+  final List<CategoryModel> categoryList;
+  final void Function(CategoryModel) onAddCategory;
+  final void Function(CategoryModel) onDeleteCategory; //
 
   const Categories({
     required this.categoryList,
@@ -51,7 +50,7 @@ class Categories extends StatelessWidget {
           ),
           builder: (_) => const AddCategorySheet(),
         );
-        if (newCategory != null && newCategory is Category) {
+        if (newCategory != null && newCategory is CategoryModel) {
           onAddCategory(newCategory);
         }
       },
@@ -71,7 +70,7 @@ class Categories extends StatelessWidget {
     );
   }
 
-  Widget _buildCategory(BuildContext context, Category category) {
+  Widget _buildCategory(BuildContext context, CategoryModel category) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -102,15 +101,7 @@ class Categories extends StatelessWidget {
                 onPressed: () async {
                   Navigator.of(dialogContext).pop();
 
-                  final uid = FirebaseAuth.instance.currentUser?.uid;
-                  if (uid != null) {
-                    await FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(uid)
-                        .collection('categories')
-                        .doc(category.id)
-                        .delete();
-                  }
+                  await CategoryRepository.deleteCategory(category.id);
 
                   onDeleteCategory(category); //  Pass category instead of index
                 },

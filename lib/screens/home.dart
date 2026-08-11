@@ -1,15 +1,12 @@
-import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:hisabshare/Models/add_category.dart';
-import 'package:hisabshare/Models/category.dart';
+import 'package:hisabshare/Models/model.dart';
 import 'package:hisabshare/notifications.dart';
 import 'package:hisabshare/profile.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hisabshare/screens/detail.dart';
 import 'package:hisabshare/widgets/hisaab.dart';
-
-import '../Models/model_data.dart';
+import 'package:hisabshare/repositories/category_repository.dart';
 
 class Homepage extends StatefulWidget {
     final void Function(bool) onThemeToggle;
@@ -27,7 +24,7 @@ class Homepage extends StatefulWidget {
 }
 class _HomepageState extends State<Homepage> {
   int _selectedIndex = 0;
-  List<Category> taskList = [];
+  List<CategoryModel> taskList = [];
   bool _isLoading = true;
   //num totalsend = 0;
   //num totalreceive = 0;
@@ -41,7 +38,7 @@ class _HomepageState extends State<Homepage> {
     _calculateTotalTransactionsForHome();
 
   }
-  void _addCategory(Category newCategory) {
+  void _addCategory(CategoryModel newCategory) {
   setState(() {
     taskList.insert(taskList.length - 1, newCategory); // before "+Add"
   });
@@ -103,11 +100,11 @@ Widget _buildBalanceCard({
      final snapshot = await userCategoriesCollection.get();
 
   if (snapshot.docs.isEmpty) {
-    final defaultCategories = Category.generateCategories();
+    final defaultCategories = CategoryRepository.generateCategories();
 
     final batch = FirebaseFirestore.instance.batch();
     for (var category in defaultCategories) {
-  final docRef = userCategoriesCollection.doc(category.id); 
+  final docRef = userCategoriesCollection.doc(category.id);
   batch.set(docRef, {
     ...category.toMap(),
     'createdAt': FieldValue.serverTimestamp(),
@@ -118,12 +115,12 @@ Widget _buildBalanceCard({
     return;
   }
 
-  List<Category> loadedCategories = snapshot.docs.map((doc) {
+  List<CategoryModel> loadedCategories = snapshot.docs.map((doc) {
     final data = doc.data() as Map<String, dynamic>;
-    return Category.fromMap(data, doc.id);
+    return CategoryModel.fromMap(data, doc.id);
   }).toList();
 
-  loadedCategories.add(Category(
+  loadedCategories.add(CategoryModel(
     id: 'add_button',
     title: '',
     iconData: Icons.add,
@@ -131,9 +128,7 @@ Widget _buildBalanceCard({
     iconColor: Colors.black,
     isLast: true,
   ));
-  //
 
- final loaded = await Category.loadOrInitializeCategories();
   setState(() {
     taskList = loadedCategories;
     _isLoading = false;
@@ -212,17 +207,9 @@ void _showAddCategorySheet(BuildContext context) async {
       }
     }
   }*/
-  void _deleteCategory(Category category) async {
+  void _deleteCategory(CategoryModel category) async {
   if (!category.isLast) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('categories')
-          .doc(category.id)
-          .delete();
-    }
+    await CategoryRepository.deleteCategory(category.id);
   }
 }
 
@@ -441,10 +428,10 @@ return Column(
 
           final loadedCategories = snapshot.data!.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            return Category.fromMap(data, doc.id);
+            return CategoryModel.fromMap(data, doc.id);
           }).toList();
 
-          loadedCategories.add(Category(
+          loadedCategories.add(CategoryModel(
             id: 'add_button',
             title: '',
             iconData: Icons.add,

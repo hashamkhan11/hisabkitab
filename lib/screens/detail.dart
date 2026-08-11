@@ -8,6 +8,7 @@ import 'package:hisabshare/Models/contact_detail.dart';
 import 'package:hisabshare/Models/shareduser_infopage.dart';
 import 'package:hisabshare/screens/list.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hisabshare/repositories/contact_repository.dart';
 import 'dart:async';
 
 class DetailPage extends StatefulWidget {
@@ -340,132 +341,20 @@ void _recalculateAllTransactions() async {
   });
 }
 
-/*void _loadContacts() async {
-  final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
-  if (currentUserUid == null) return;
-
-  final List<Map<String, dynamic>> loaded = [];
-
-  final snapshot = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(currentUserUid)
-      .collection('categories')
-      .doc(widget.categoryId)
-      .collection('contacts')
-      .get();
-
-  final docs = snapshot.docs;
-
-  //  Parallel balance fetch for all contacts
-  final balances = await Future.wait(docs.map((doc) async {
-    return await _fetchBalance(currentUserUid, doc.id);
-  }));
-
-  for (int i = 0; i < docs.length; i++) {
-    final doc = docs[i];
-    final data = doc.data();
-    final contactId = doc.id;
-    final name = data['name'] as String?;
-    if (name == null) continue;
-    final balance = balances[i];
-
-    // Shared Contact (Reversed)
-    if (data['isSharedView'] == true &&
-        data['sharedUserId'] != null &&
-        data['sharedCategoryId'] != null) {
-      loaded.add({
-        'id': contactId,
-        'name': name,
-        'amount': balance,
-        'color': _getRandomCardColor(),
-        'mobileNo': data['mobileNo'] ?? '',
-        'email': data['email'] ?? '',
-        'address': data['address'] ?? '',
-        'isSharedView': true,
-        'sharedUserId': data['sharedUserId'],
-        'sharedCategoryId': data['sharedCategoryId'],
-        'originalContactId': data['originalContactId'],
-        'sharedBy': data['sharedBy'] ?? {},
-      });
-    } else {
-      // Normal Contact
-      Map<String, dynamic>? sharedUser;
-
-      //  Optional: Load sharedWith only if needed
-      if (data['hasSharedWith'] == true) {
-        final sharedSnapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUserUid)
-            .collection('categories')
-            .doc(widget.categoryId)
-            .collection('contacts')
-            .doc(contactId)
-            .collection('sharedWith')
-            .get();
-
-        if (sharedSnapshot.docs.isNotEmpty) {
-          final firstShared = sharedSnapshot.docs.first;
-          final sharedData = firstShared.data();
-          sharedUser = {
-            'uid': sharedData['uid'],
-            'username': sharedData['name'] ?? '',
-            'email': sharedData['email'] ?? '',
-            'imageUrl': sharedData['imageUrl'] ?? '',
-            'mobileNo': sharedData['mobileNo'] ?? '',
-          };
-        }
-      }
-      loaded.add({
-        'id': contactId,
-        'name': name,
-        'amount': balance,
-        'color': _getRandomCardColor(),
-        'mobileNo': data['mobileNo'] ?? '',
-        'email': data['email'] ?? '',
-        'address': data['address'] ?? '',
-        'isSharedView': false,
-        'sharedUserId': null,
-        if (sharedUser != null) 'sharedUser': sharedUser,
-      });
-    }
-  }
-  // Set the loaded contacts in your state (example)
-  setState(() {
-   persons = loaded;
-  filteredPersons = loaded; 
-  });
-}*/
   void _addContact(Map<String, dynamic> newContact) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
- 
-    final name = newContact['name'];
-    if (name is String && name.isNotEmpty) {
-      final contactDocRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('categories')
-          .doc(widget.categoryId)
-          .collection('contacts')
-          .doc(); // Auto-ID
- 
-      final generatedId = contactDocRef.id;
- 
-      await contactDocRef.set({
-        'id': generatedId,
-        'name': name,
-        'mobileNo': newContact['mobileNo'] ?? '',
-        'email': newContact['email'] ?? '',
-        'address': newContact['address'] ?? '',
-        'category': widget.categoryName,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
- 
+    final generatedId = await ContactRepository.addContact(
+      categoryId: widget.categoryId,
+      categoryName: widget.categoryName,
+      newContact: newContact,
+    );
+
+    if (generatedId != null) {
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
       final balance = await _fetchBalance(uid, generatedId);
- 
+
       final newPerson = {
         'id': generatedId,
-        'name': name,
+        'name': newContact['name'],
         'amount': balance,
         'color': _getRandomCardColor(),
         'mobileNo': newContact['mobileNo'] ?? '',
@@ -484,9 +373,6 @@ void _recalculateAllTransactions() async {
     }
   }
   void _deleteContact(String contactId) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
- 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -499,14 +385,10 @@ void _recalculateAllTransactions() async {
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(uid)
-                  .collection('categories')
-                  .doc(widget.categoryId)
-                  .collection('contacts')
-                  .doc(contactId)
-                  .delete();
+              await ContactRepository.deleteContact(
+                categoryId: widget.categoryId,
+                contactId: contactId,
+              );
               setState(() {
                 persons.removeWhere((p) => p['id'] == contactId);
                 filteredPersons.removeWhere((p) => p['id'] == contactId);
