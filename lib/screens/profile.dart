@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hisabshare/repositories/user_repository.dart';
 import 'package:hisabshare/screens/login.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -38,23 +38,17 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadProfileImage() async {
-  final uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid != null) {
-    try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        setState(() {
-          _imageUrl = data['imageUrl'] as String?;
-          _MobileNoController.text = data['mobileNo'] ?? '';
-          _nameController.text = data['username'] ?? '';
-         // _emailController.text = data['email'] ?? '';
-          _emailController.text = FirebaseAuth.instance.currentUser?.email ?? '';
-
-        });
-      }
-    } catch (_) {
+  try {
+    final data = await UserRepository.getMe();
+    if (data != null) {
+      setState(() {
+        _imageUrl = data['image_url'] as String?;
+        _MobileNoController.text = data['mobile_no'] ?? '';
+        _nameController.text = data['username'] ?? '';
+        _emailController.text = FirebaseAuth.instance.currentUser?.email ?? '';
+      });
     }
+  } catch (_) {
   }
 }
 
@@ -92,11 +86,7 @@ Future<void> _pickImage(ImageSource source) async {
       if (snapshot.state == TaskState.success) {
         final url = await snapshot.ref.getDownloadURL();
 
-      // Save to Firestore (use merge: true to avoid doc not existing issue)
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .set({'imageUrl': url}, SetOptions(merge: true));
+        await UserRepository.updateMe(imageUrl: url);
 
         setState(() {
           _imageUrl = url;
@@ -165,7 +155,6 @@ Future<void> sendEmailChangeVerification(String newEmail) async {
 }
   Future<void> _saveChanges() async {
   try {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
     final currentUser = FirebaseAuth.instance.currentUser;
 
     final newName = _nameController.text.trim();
@@ -245,29 +234,13 @@ Future<void> sendEmailChangeVerification(String newEmail) async {
       _CurrentpasswordController.clear();
     }
 
-    // Save all fields including name, email, mobileNo directly to users/{uid}
-   /* await FirebaseFirestore.instance.collection('users').doc(uid).set({
-      'username': newName,
-      'mobileNo': newMobileNo,
-      'email': newEmail,
-      'imageUrl': _imageUrl ?? '',
-    }, SetOptions(merge: true)); */// preserve existing imageUrl if unchanged
-
-    Map<String, dynamic> dataToUpdate = {
-  'username': newName,
-  'mobileNo': newMobileNo,
-  'imageUrl': _imageUrl ?? '',
-};
-
-//  Only update email in Firestore if it’s actually verified (i.e., not changed or already verified)
-if (newEmail == currentUser?.email) {
-  dataToUpdate['email'] = newEmail;
-}
-
-await FirebaseFirestore.instance.collection('users').doc(uid).set(
-  dataToUpdate,
-  SetOptions(merge: true),
-);
+    // Email isn't sent here - the backend lazily syncs it from the verified
+    // Firebase ID token on every authenticated request, not from client input.
+    await UserRepository.updateMe(
+      username: newName,
+      mobileNo: newMobileNo,
+      imageUrl: _imageUrl ?? '',
+    );
 
     await currentUser?.reload();
 

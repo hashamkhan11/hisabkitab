@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hisabshare/repositories/user_repository.dart';
 import 'package:hisabshare/screens/forgot_password.dart';
 import 'package:hisabshare/screens/signup.dart';
 import 'package:hisabshare/screens/home.dart';
@@ -23,15 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<String?> _getEmailFromMobile(String mobileNo) async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('mobileNo', isEqualTo: mobileNo)
-          .limit(1)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        return snapshot.docs.first['email'];
-      }
+      return await UserRepository.lookupEmailByMobile(mobileNo);
     } catch (e) {
       debugPrint("Error fetching email from mobile: $e");
     }

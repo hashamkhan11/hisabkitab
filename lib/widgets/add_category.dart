@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
+import '../repositories/category_repository.dart';
 
 class AddCategorySheet extends StatefulWidget {
   const AddCategorySheet({super.key});
@@ -39,31 +39,13 @@ class _AddCategorySheetState extends State<AddCategorySheet> {
     return;
   }
 
-  final uid = FirebaseAuth.instance.currentUser!.uid;
-  final categoryRef = FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .collection('categories')
-      .doc();
+  final category = await CategoryRepository.createCategory(
+    title: title,
+    bgColor: _selectedColor,
+    iconData: _selectedIcon,
+  );
 
-  await categoryRef.set({
-    'name': title,
-    'title': title,
-    'color': _selectedColor.value,
-    'icon': _selectedIcon.codePoint,
-    'iconFontFamily': _selectedIcon.fontFamily,
-    'iconFontPackage': _selectedIcon.fontPackage,
-    'createdAt': FieldValue.serverTimestamp(),
-  });
- // Navigator.pop(context, 'success');
- Navigator.pop(context, {
-  'id': categoryRef.id,
-  'title': title,
-  'color': _selectedColor.value,
-  'icon': _selectedIcon.codePoint,
-  'iconFontFamily': _selectedIcon.fontFamily,
-  'iconFontPackage': _selectedIcon.fontPackage,
-});
+  if (mounted) Navigator.pop(context, category);
 }
   @override
   Widget build(BuildContext context) {

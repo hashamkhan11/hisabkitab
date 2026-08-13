@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class CategoryModel {
@@ -7,8 +6,6 @@ class CategoryModel {
   String title;
   Color? bgColor;
   Color? iconColor;
-  List<Map<String, dynamic>>? desc;
-  List<Map<String, dynamic>>? completed;
   bool isLast;
   DateTime? createdAt;
   final int? position;
@@ -20,46 +17,39 @@ class CategoryModel {
     required this.title,
     this.bgColor,
     this.iconColor,
-    this.desc,
-    this.completed,
     this.isLast = false,
     this.createdAt,
     this.position,
     this.isDefault = false,
   });
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'title': title,
-      'icon': iconData?.codePoint ?? 0,
-      'iconFontFamily': iconData?.fontFamily ?? 'CupertinoIcons',
-      'iconFontPackage': iconData?.fontPackage ?? 'cupertino_icons',
-      'bgColor': bgColor?.value ?? 0,
-      'iconColor': iconColor?.value ?? 0,
-      'desc': desc ?? [],
-      'completed': completed ?? [],
-      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'icon_codepoint': iconData?.codePoint,
+      'icon_font_family': iconData?.fontFamily,
+      'icon_font_package': iconData?.fontPackage,
+      'bg_color': bgColor?.toARGB32(),
+      'icon_color': iconColor?.toARGB32(),
       'position': position,
-      'isDefault': isDefault,
+      'is_default': isDefault,
     };
   }
 
-  factory CategoryModel.fromMap(Map<String, dynamic> map, String docId) {
+  factory CategoryModel.fromJson(Map<String, dynamic> json) {
     return CategoryModel(
-      id: docId,
-      title: map['title'] ?? map['name'] ?? 'Untitled',
+      id: json['id'] as String,
+      title: json['title'] ?? 'Untitled',
       iconData: IconData(
-        map['icon'] ?? Icons.category.codePoint,
-        fontFamily: map['iconFontFamily'] ?? 'CupertinoIcons',
-        fontPackage: map['iconFontPackage'],
+        json['icon_codepoint'] ?? Icons.category.codePoint,
+        fontFamily: json['icon_font_family'] ?? 'CupertinoIcons',
+        fontPackage: json['icon_font_package'],
       ),
-      bgColor: map['bgColor'] != null ? Color(map['bgColor']) : (map['color'] != null ? Color(map['color']) : Colors.grey),
-      iconColor: map['iconColor'] != null ? Color(map['iconColor']) : Colors.white,
-      desc: List<Map<String, dynamic>>.from(map['desc'] ?? []),
-      completed: List<Map<String, dynamic>>.from(map['completed'] ?? []),
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
-      position: map['position'],
-      isDefault: map['isDefault'] ?? false,
+      bgColor: json['bg_color'] != null ? Color(json['bg_color']) : Colors.grey,
+      iconColor: json['icon_color'] != null ? Color(json['icon_color']) : Colors.white,
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
+      position: json['position'],
+      isDefault: json['is_default'] == true,
     );
   }
 }

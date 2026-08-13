@@ -129,7 +129,7 @@ class Categories extends StatelessWidget {
               ),
             ),
             Text(
-              category.title ?? '',
+              category.title,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 20,

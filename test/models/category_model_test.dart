@@ -1,97 +1,88 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisabshare/models/model.dart';
 
 void main() {
-  group('CategoryModel.fromMap', () {
-    test('parses a fully-populated Firestore document map', () {
+  group('CategoryModel.fromJson', () {
+    test('parses a fully-populated API response', () {
       final createdAt = DateTime(2026, 1, 1);
-      final map = {
+      final json = {
+        'id': 'cat123',
         'title': 'Groceries',
-        'icon': Icons.shopping_cart.codePoint,
-        'iconFontFamily': 'MaterialIcons',
-        'bgColor': Colors.blue.toARGB32(),
-        'iconColor': Colors.white.toARGB32(),
-        'desc': [
-          {'note': 'weekly'}
-        ],
-        'completed': [
-          {'id': '1'}
-        ],
-        'createdAt': Timestamp.fromDate(createdAt),
+        'icon_codepoint': Icons.shopping_cart.codePoint,
+        'icon_font_family': 'MaterialIcons',
+        'icon_font_package': null,
+        'bg_color': Colors.blue.toARGB32(),
+        'icon_color': Colors.white.toARGB32(),
+        'created_at': createdAt.toIso8601String(),
         'position': 2,
-        'isDefault': true,
+        'is_default': true,
       };
 
-      final category = CategoryModel.fromMap(map, 'cat123');
+      final category = CategoryModel.fromJson(json);
 
       expect(category.id, 'cat123');
       expect(category.title, 'Groceries');
       expect(category.position, 2);
       expect(category.isDefault, true);
       expect(category.createdAt, createdAt);
-      expect(category.desc, [
-        {'note': 'weekly'}
-      ]);
-      expect(category.completed, [
-        {'id': '1'}
-      ]);
+      expect(category.bgColor?.toARGB32(), Colors.blue.toARGB32());
+      expect(category.iconColor?.toARGB32(), Colors.white.toARGB32());
     });
 
     test('falls back to defaults when optional fields are missing', () {
-      final category = CategoryModel.fromMap({}, 'cat456');
+      final category = CategoryModel.fromJson({'id': 'cat456'});
 
       expect(category.id, 'cat456');
       expect(category.title, 'Untitled');
       expect(category.isDefault, false);
       expect(category.position, null);
       expect(category.createdAt, null);
-      expect(category.desc, []);
-      expect(category.completed, []);
-    });
-
-    test('falls back to the legacy "name" field when "title" is absent', () {
-      final category = CategoryModel.fromMap({'name': 'Legacy Category'}, 'cat789');
-      expect(category.title, 'Legacy Category');
+      expect(category.bgColor, Colors.grey);
+      expect(category.iconColor, Colors.white);
     });
   });
 
-  group('CategoryModel.toMap', () {
-    test('serializes an explicit createdAt as a Firestore Timestamp', () {
-      final createdAt = DateTime(2026, 3, 5);
+  group('CategoryModel.toJson', () {
+    test('serializes the canonical snake_case fields', () {
       final category = CategoryModel(
         id: 'cat1',
         title: 'Rent',
-        createdAt: createdAt,
+        bgColor: Colors.blue,
+        iconColor: Colors.white,
         position: 1,
         isDefault: false,
       );
 
-      final map = category.toMap();
+      final json = category.toJson();
 
-      expect(map['title'], 'Rent');
-      expect(map['position'], 1);
-      expect(map['isDefault'], false);
-      expect(map['createdAt'], Timestamp.fromDate(createdAt));
+      expect(json['title'], 'Rent');
+      expect(json['position'], 1);
+      expect(json['is_default'], false);
+      expect(json['bg_color'], Colors.blue.toARGB32());
+      expect(json['icon_color'], Colors.white.toARGB32());
     });
 
-    test('round-trips through fromMap when createdAt is explicit', () {
-      final createdAt = DateTime(2026, 3, 5);
+    test('round-trips through fromJson', () {
       final original = CategoryModel(
         id: 'cat1',
         title: 'Rent',
-        createdAt: createdAt,
+        bgColor: Colors.blue,
+        iconColor: Colors.white,
         position: 1,
         isDefault: true,
       );
 
-      final restored = CategoryModel.fromMap(original.toMap(), original.id);
+      final json = original.toJson();
+      json['id'] = original.id;
+      final restored = CategoryModel.fromJson(json);
 
+      expect(restored.id, original.id);
       expect(restored.title, original.title);
       expect(restored.position, original.position);
       expect(restored.isDefault, original.isDefault);
-      expect(restored.createdAt, original.createdAt);
+      expect(restored.bgColor?.toARGB32(), original.bgColor?.toARGB32());
+      expect(restored.iconColor?.toARGB32(), original.iconColor?.toARGB32());
     });
   });
 }

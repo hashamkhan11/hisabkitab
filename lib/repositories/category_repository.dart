@@ -1,13 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:uuid/uuid.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/model.dart';
+import '../services/api_client.dart';
 
-/// Centralizes Firestore access for `users/{uid}/categories`.
-/// Behavior ported as-is from the old `Category` class in Models/category.dart.
+/// Centralizes category access against the Laravel API (`/api/categories`).
 class CategoryRepository {
   static List<CategoryModel> generateCategories() {
     final uuid = Uuid();
@@ -18,8 +16,6 @@ class CategoryRepository {
         iconData: CupertinoIcons.person_2,
         bgColor: Colors.green,
         iconColor: Colors.white,
-        desc: [],
-        completed: [],
         position: 0,
         isDefault: true,
       ),
@@ -29,8 +25,6 @@ class CategoryRepository {
         iconData: CupertinoIcons.person_2,
         bgColor: Colors.blue,
         iconColor: Colors.white,
-        desc: [],
-        completed: [],
         position: 1,
         isDefault: true,
       ),
@@ -40,8 +34,6 @@ class CategoryRepository {
         iconData: CupertinoIcons.person_2,
         bgColor: Colors.yellow,
         iconColor: Colors.white,
-        desc: [],
-        completed: [],
         position: 2,
         isDefault: true,
       ),
@@ -51,8 +43,6 @@ class CategoryRepository {
         iconData: CupertinoIcons.person_2,
         bgColor: Colors.red,
         iconColor: Colors.white,
-        desc: [],
-        completed: [],
         position: 3,
         isDefault: true,
       ),
@@ -67,80 +57,44 @@ class CategoryRepository {
     );
   }
 
-  static Future<void> storeCategoriesToFirestore(List<CategoryModel> categories) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) throw Exception('User not logged in');
-
-    final collectionRef = FirebaseFirestore.instance.collection('users').doc(uid).collection('categories');
-    final batch = FirebaseFirestore.instance.batch();
-
-    for (var category in categories.where((c) => !c.isLast)) {
-      final docRef = collectionRef.doc(category.id);
-      batch.set(docRef, category.toMap());
-    }
-    await batch.commit();
-  }
-
-  static Future<List<CategoryModel>> loadCategoriesFromFirestore() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) throw Exception('User not logged in');
-
-    final querySnapshot = await FirebaseFirestore.instance.collection('users').doc(uid).collection('categories').get();
-
-    final categories = querySnapshot.docs.map((doc) => CategoryModel.fromMap(doc.data(), doc.id)).toList();
-
-    final defaults = categories.where((c) => c.isDefault).toList();
-    final custom = categories.where((c) => !c.isDefault && !c.isLast).toList();
-
-    defaults.sort((a, b) => (a.position ?? 0).compareTo(b.position ?? 0));
-    custom.sort((a, b) => (a.position ?? 0).compareTo(b.position ?? 0));
-
-    return [...defaults, ...custom, getAddCategoryBox()];
-  }
-
-  static Future<void> updateCustomCategoryPositions(List<CategoryModel> customCategories) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) throw Exception('User not logged in');
-
-    final batch = FirebaseFirestore.instance.batch();
-    final collection = FirebaseFirestore.instance.collection('users').doc(uid).collection('categories');
-
-    for (int i = 0; i < customCategories.length; i++) {
-      final category = customCategories[i];
-      final docRef = collection.doc(category.id);
-      batch.update(docRef, {'position': i});
-    }
-    await batch.commit();
-  }
-
+  /// Loads the user's categories, seeding the default set on first run
+  /// (mirrors the old Firestore "seed if empty" behavior). The API already
+  /// orders results `is_default desc, position asc`, so no client-side
+  /// re-sort is needed.
   static Future<List<CategoryModel>> loadOrInitializeCategories() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) throw Exception('User not logged in');
+    var categories = await _fetchCategories();
 
-    final collectionRef = FirebaseFirestore.instance.collection('users').doc(uid).collection('categories');
-
-    final snapshot = await collectionRef.get();
-
-    if (snapshot.docs.isEmpty) {
-      final defaultCategories = generateCategories();
-      await storeCategoriesToFirestore(defaultCategories);
-      return [...defaultCategories, getAddCategoryBox()];
+    if (categories.isEmpty) {
+      await ApiClient.instance.post('/categories/batch', body: {
+        'categories': generateCategories().map((c) => c.toJson()).toList(),
+      });
+      categories = await _fetchCategories();
     }
-    final loaded = await loadCategoriesFromFirestore();
-    loaded.sort((a, b) {
-      if (a.isLast) return 1;
-      if (b.isLast) return -1;
-      if (a.createdAt != null && b.createdAt != null) {
-        return a.createdAt!.compareTo(b.createdAt!);
-      }
-      return 0;
+
+    return [...categories, getAddCategoryBox()];
+  }
+
+  static Future<List<CategoryModel>> _fetchCategories() async {
+    final data = await ApiClient.instance.get('/categories') as List<dynamic>;
+    return data.map((json) => CategoryModel.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  static Future<CategoryModel> createCategory({
+    required String title,
+    Color? bgColor,
+    IconData? iconData,
+  }) async {
+    final data = await ApiClient.instance.post('/categories', body: {
+      'title': title,
+      'bg_color': bgColor?.toARGB32(),
+      'icon_codepoint': iconData?.codePoint,
+      'icon_font_family': iconData?.fontFamily,
+      'icon_font_package': iconData?.fontPackage,
     });
-    return [...loaded, getAddCategoryBox()];
+    return CategoryModel.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<void> deleteCategory(String categoryId) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    await FirebaseFirestore.instance.collection('users').doc(uid).collection('categories').doc(categoryId).delete();
+    await ApiClient.instance.delete('/categories/$categoryId');
   }
 }

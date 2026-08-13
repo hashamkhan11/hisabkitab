@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hisabshare/widgets/add_category.dart';
 import 'package:hisabshare/models/model.dart';
 import 'package:hisabshare/screens/notifications.dart';
 import 'package:hisabshare/screens/profile.dart';
@@ -7,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hisabshare/widgets/hisaab.dart';
 import 'package:hisabshare/repositories/category_repository.dart';
+import 'package:hisabshare/repositories/user_repository.dart';
 
 class Homepage extends StatefulWidget {
     final void Function(bool) onThemeToggle;
@@ -34,7 +34,7 @@ class _HomepageState extends State<Homepage> {
   @override
   void initState() {
     super.initState();
-    _loadCategoriesFromFirestore();
+    _loadCategories();
     _calculateTotalTransactionsForHome();
 
   }
@@ -84,132 +84,29 @@ Widget _buildBalanceCard({
   );
 }
 
-  Future<void> _loadCategoriesFromFirestore() async {
+  Future<void> _loadCategories() async {
   setState(() {
     _isLoading = true;
   });
 
-  final uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null) return;
-
-  final userCategoriesCollection = FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .collection('categories');
-
-     final snapshot = await userCategoriesCollection.get();
-
-  if (snapshot.docs.isEmpty) {
-    final defaultCategories = CategoryRepository.generateCategories();
-
-    final batch = FirebaseFirestore.instance.batch();
-    for (var category in defaultCategories) {
-  final docRef = userCategoriesCollection.doc(category.id);
-  batch.set(docRef, {
-    ...category.toMap(),
-    'createdAt': FieldValue.serverTimestamp(),
-  });
-}
-    await batch.commit();
-    await _loadCategoriesFromFirestore(); // recursive reload
-    return;
-  }
-
-  List<CategoryModel> loadedCategories = snapshot.docs.map((doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return CategoryModel.fromMap(data, doc.id);
-  }).toList();
-
-  loadedCategories.add(CategoryModel(
-    id: 'add_button',
-    title: '',
-    iconData: Icons.add,
-    bgColor: Colors.grey.shade300,
-    iconColor: Colors.black,
-    isLast: true,
-  ));
-
-  setState(() {
-    taskList = loadedCategories;
-    _isLoading = false;
-  });
-}
-
-/*void _handleAddCategory(Category newCategory) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-
-    final categoryMap = newCategory.toMap();
-    categoryMap['createdAt'] = FieldValue.serverTimestamp();
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .add(categoryMap);
-    await _loadCategoriesFromFirestore();
-  }
-
-  void _handleDeleteCategory(int index) {
+  try {
+    final categories = await CategoryRepository.loadOrInitializeCategories();
     setState(() {
-      taskList.removeAt(index);
+      taskList = categories;
+      _isLoading = false;
     });
-  }*/
-void _showAddCategorySheet(BuildContext context) async {
-  final result = await showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (context) => const AddCategorySheet(),
-  );
-
-  if (result == 'success') {
-    await _loadCategoriesFromFirestore(); //  Refresh categories
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Category created successfully')),
-    );
+  } catch (_) {
+    setState(() {
+      _isLoading = false;
+    });
   }
 }
-  void _navigateToAddCategory() async {
-  final result = await showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (_) => const AddCategorySheet(),
-  );
 
-  if (result == true) {
-    await _loadCategoriesFromFirestore(); 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Category created successfully')),
-    );
-  }
-}
-  /*void _deleteCategory(int index) async {
-    if (index >= 0 && index < taskList.length) {
-      final deletedTask = taskList[index];
-      if (!deletedTask.isLast) {
-        final uid = FirebaseAuth.instance.currentUser?.uid;
-        if (uid != null) {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .collection('categories')
-              .doc(deletedTask.id)
-              .delete();
-        }
-        setState(() {
-          taskList.removeAt(index);
-        });
-      }
-    }
-  }*/
-  void _deleteCategory(CategoryModel category) async {
+  void _deleteCategory(CategoryModel category) {
   if (!category.isLast) {
-    await CategoryRepository.deleteCategory(category.id);
+    setState(() {
+      taskList.removeWhere((c) => c.id == category.id);
+    });
   }
 }
 
@@ -410,43 +307,13 @@ return Column(
 ),
 
     Expanded(
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(FirebaseAuth.instance.currentUser!.uid)
-            .collection('categories')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("No categories found"));
-          } 
-
-          final loadedCategories = snapshot.data!.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return CategoryModel.fromMap(data, doc.id);
-          }).toList();
-
-          loadedCategories.add(CategoryModel(
-            id: 'add_button',
-            title: '',
-            iconData: Icons.add,
-            bgColor: Colors.grey.shade300,
-            iconColor: Colors.black,
-            isLast: true,
-          ));
-
-          return Categories(
-            categoryList: loadedCategories,
-            onAddCategory: (_) => _navigateToAddCategory(),
-            onDeleteCategory: _deleteCategory,
-          );
-        },
-      ),
+      child: taskList.isEmpty
+          ? const Center(child: Text("No categories found"))
+          : Categories(
+              categoryList: taskList,
+              onAddCategory: _addCategory,
+              onDeleteCategory: _deleteCategory,
+            ),
     ),
   ],
 );
@@ -589,11 +456,8 @@ if (type == 'send') {
     },
     child: Padding(
       padding: const EdgeInsets.only(right: 12.0),
-      child: FutureBuilder<DocumentSnapshot>(
-        future: FirebaseFirestore.instance
-            .collection('users')
-            .doc(FirebaseAuth.instance.currentUser!.uid)
-            .get(),
+      child: FutureBuilder<Map<String, dynamic>?>(
+        future: UserRepository.getMe(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const CircleAvatar(
@@ -609,11 +473,10 @@ if (type == 'send') {
             );
           }
 
-          final userData = snapshot.data!.data() as Map<String, dynamic>;
-          final imageUrl = userData['imageUrl'];
+          final imageUrl = snapshot.data!['image_url'];
 
           return CircleAvatar(
-            backgroundImage: imageUrl != null
+            backgroundImage: imageUrl != null && (imageUrl as String).isNotEmpty
                 ? NetworkImage(imageUrl)
                 : const AssetImage('assets/logo.png') as ImageProvider,
           );

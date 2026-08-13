@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hisabshare/repositories/user_repository.dart';
 import 'package:hisabshare/screens/privacy_policy_page.dart';
 import 'package:hisabshare/screens/terms_page.dart';
 
@@ -61,14 +61,12 @@ if (_emailController.text.trim().isEmpty) {
         password: _passwordController.text.trim(),
       );
 
-      //  Save user data including mobile number to Firestore
-      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
-        'username': _usernameController.text.trim(),
-        'mobileNo': _mobileNoController.text.trim(), //  Save Mobile No
-        'email': _emailController.text.trim(),
-        'createdAt': Timestamp.now(),
-        'imageUrl': '',
-      });
+      //  Save user data including mobile number to the API (email is set from
+      //  the verified Firebase ID token via the backend's lazy-sync, not here)
+      await UserRepository.updateMe(
+        username: _usernameController.text.trim(),
+        mobileNo: _mobileNoController.text.trim(),
+      );
 
 await userCredential.user!.sendEmailVerification();
 
