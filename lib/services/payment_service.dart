@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+
+import '../repositories/user_repository.dart';
 
 class PaymentService {
   static Future<void> handlePay(BuildContext context, Map<String, dynamic> txn) async {
@@ -60,13 +60,9 @@ class PaymentService {
     final amount = txn['credit'];
     final orderRef = "T${DateTime.now().millisecondsSinceEpoch}";
 
-    // Get current Firebase user
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    final data = userDoc.data();
-
-    final email = data?['email'];
-    final mobileNo = data?['mobileNo'];
+    final me = await UserRepository.getMe();
+    final email = me?['email'];
+    final mobileNo = me?['mobile_no'];
 
     if (email == null || email.isEmpty || mobileNo == null || mobileNo.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,13 +110,9 @@ class PaymentService {
     final amount = txn['credit'];
     final orderRef = "EP${DateTime.now().millisecondsSinceEpoch}";
 
-    // Get current Firebase user
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    final data = userDoc.data();
-
-    final email = data?['email'];
-    final mobileNo = data?['mobileNo'];
+    final me = await UserRepository.getMe();
+    final email = me?['email'];
+    final mobileNo = me?['mobile_no'];
 
     if (email == null || email.isEmpty || mobileNo == null || mobileNo.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

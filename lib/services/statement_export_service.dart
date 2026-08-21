@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -30,8 +29,7 @@ class StatementExportService {
 
             pw.SizedBox(height: 20),
             ...transactions.map((tx) {
-              final rawDate = tx['date'];
-              final date = rawDate is Timestamp ? rawDate.toDate() : rawDate as DateTime;
+              final date = tx['date'] as DateTime;
 
               final type = tx['type'];
               final amount = (tx['credit'] as num).toStringAsFixed(2);

@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:hisabshare/models/model.dart';
 import 'package:hisabshare/screens/notifications.dart';
 import 'package:hisabshare/screens/profile.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hisabshare/widgets/hisaab.dart';
 import 'package:hisabshare/repositories/category_repository.dart';
+import 'package:hisabshare/repositories/summary_repository.dart';
 import 'package:hisabshare/repositories/user_repository.dart';
 
 class Homepage extends StatefulWidget {
@@ -26,17 +25,11 @@ class _HomepageState extends State<Homepage> {
   int _selectedIndex = 0;
   List<CategoryModel> taskList = [];
   bool _isLoading = true;
-  //num totalsend = 0;
-  //num totalreceive = 0;
-  int totalSend = 0;
-  int totalReceive = 0;
 
   @override
   void initState() {
     super.initState();
     _loadCategories();
-    _calculateTotalTransactionsForHome();
-
   }
   void _addCategory(CategoryModel newCategory) {
   setState(() {
@@ -110,13 +103,7 @@ Widget _buildBalanceCard({
   }
 }
 
- /* List<Widget> _pages() => [
-        _buildHomeContent(),
-        const ProfilePage(),
-        const NotificationPage(),
-      ];*/
-      
-      List<Widget> _pages() => [
+  List<Widget> _pages() => [
   _buildHomeContent(),
   ProfilePage(
     onBackToHome: () {
@@ -133,73 +120,6 @@ Widget _buildBalanceCard({
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
   }
-Future<void> _calculateTotalTransactionsForHome() async {
-  final uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null) return;
-
-  double send = 0.0;
-  double receive = 0.0;
-
-  // 1. Your own contacts
-  final categories = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .collection('categories')
-      .get();
-
-  for (var categoryDoc in categories.docs) {
-    final contacts = await categoryDoc.reference.collection('contacts').get();
-
-    for (var contactDoc in contacts.docs) {
-      final txns = await contactDoc.reference.collection('transactions').get();
-
-      for (var doc in txns.docs) {
-        final data = doc.data();
-        final amount = (data['credit'] ?? 0).toDouble();
-        final type = (data['type'] ?? '').toString().toLowerCase();
-
-        if (type == 'send') send += amount;
-        else if (type == 'receive') receive += amount;
-      }
-    }
-  }
-  // 2. Shared contacts (assuming you store them like this)
-  final sharedSnapshot = await FirebaseFirestore.instance
-      .collection('shared_contacts')
-      .where('sharedWith', isEqualTo: uid)
-      .get();
-
-  for (var doc in sharedSnapshot.docs) {
-    final contactPath = doc['contactPath']; // example: "users/uid/categories/xyz/contacts/abc"
-    final txns = await FirebaseFirestore.instance
-        .doc(contactPath)
-        .collection('transactions')
-        .get();
-
-    for (var txn in txns.docs) {
-      final data = txn.data();
-      final amount = (data['credit'] ?? 0).toDouble();
-      final type = (data['type'] ?? '').toString().toLowerCase();
-
-      if (type == 'send') send += amount;
-      else if (type == 'receive') receive += amount;
-    }
-  }
-
-  setState(() {
-    totalSend = send.toInt();
-    totalReceive = receive.toInt();
-  });
-}
-Future<void> _refreshData() async {
-  setState(() {
-    _isLoading = true;
-  });
-  await _calculateTotalTransactionsForHome();
-  setState(() {
-    _isLoading = false;
-  });
-}
 
   @override
   Widget build(BuildContext context) {
@@ -230,56 +150,16 @@ return Column(
       ),
     ),
 
-   /* _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildBalanceCard(
-                    title: 'Receive',
-                    balanceText: 'Rs. $totalReceive',
-                    color: Colors.green.shade100,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildBalanceCard(
-                    title: 'Send',
-                    balanceText: 'Rs. $totalSend',
-                    color: Colors.red.shade100,
-                  ),
-                ),
-              ],
-            ),
-          ), */
-
-          StreamBuilder<QuerySnapshot>(
-  stream: FirebaseFirestore.instance
-      .collectionGroup('transactions')
-      .where('userId', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
-      .snapshots(),
+          StreamBuilder<Map<String, dynamic>>(
+  stream: SummaryRepository.balanceStream(),
   builder: (context, snapshot) {
     if (!snapshot.hasData) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    int totalSend = 0;
-    int totalReceive = 0;
-
-    for (var doc in snapshot.data!.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final type = (data['type'] ?? '').toString().toLowerCase();
-      final amount = (data['credit'] ?? 0) as num;
-      final credit = amount.toInt();
-
-      if (type == 'send') {
-        totalSend += credit;
-      } else if (type == 'receive') {
-        totalReceive += credit;
-      }
-    }
+    final data = snapshot.data!;
+    final totalReceive = ((data['total_receive'] ?? 0) as num).toInt();
+    final totalSend = ((data['total_send'] ?? 0) as num).toInt();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -317,120 +197,6 @@ return Column(
     ),
   ],
 );
-
- /*
- return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      _buildAppBar(),
-      Container(
-        padding: const EdgeInsets.all(15),
-        child: const Text(
-          'Dashboard',
-          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-        ),
-      ),
-
-   StreamBuilder<QuerySnapshot>(
- stream: FirebaseFirestore.instance
-      .collectionGroup('transactions')
-      .where('userId', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
-      .snapshots(),
-  builder: (context, snapshot) {
-    int totalsend = 0;
-    int totalreceive = 0;
-
-    if (snapshot.hasData) {
-      print(" Total transactions found: ${snapshot.data!.docs.length}");
-      for (var doc in snapshot.data!.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-       // final type = data['type'];
-       final type = (data['type'] ?? '').toString().toLowerCase(); 
-        final amount = (data['credit'] ?? 0) as num; // 
-final credit = (data['credit'] ?? 0) as num;
-final int creditInt = credit.toInt();
-
-print(" Transaction => type: $type | credit: $creditInt");
-if (type == 'send') {
-  totalsend += creditInt;
-} else if (type == 'receive') {
-  totalreceive += creditInt;
-} else {
-  print(" Unknown type: $type");
-}
-      }
-      print(" Calculated: send = Rs. $totalsend | Receive = Rs. $totalreceive");
-    } else if (snapshot.hasError) {
-      print(" Stream error: ${snapshot.error}");
-    } else {
-      print(" Waiting for data...");
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildBalanceCard(
-              title: 'Receive',
-              balanceText: 'Rs. $totalreceive',
-              color: Colors.green.shade100,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildBalanceCard(
-              title: 'Send',
-              balanceText: 'Rs. $totalsend',
-              color: Colors.red.shade100,
-            ),
-          ),
-        ],
-      ),
-    );
-  },
-), 
-      Expanded(
-  child: StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('users')
-        .doc(FirebaseAuth.instance.currentUser!.uid)
-        .collection('categories')
-        .orderBy('createdAt', descending: true)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return const Center(child: CircularProgressIndicator());
-      }
-
-      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-        return const Center(child: Text("No categories found"));
-      }
-
-      final loadedCategories = snapshot.data!.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return Category.fromMap(data, doc.id);
-      }).toList();
-
-      loadedCategories.add(Category(
-        id: 'add_button',
-        title: '',
-        iconData: Icons.add,
-        bgColor: Colors.grey.shade300,
-        iconColor: Colors.black,
-        isLast: true,
-      ));
-
-      return Categories(
-        categoryList: loadedCategories,
-        onAddCategory: (_) => _navigateToAddCategory(),
-        onDeleteCategory:     _deleteCategory,
-         
-      );
-    },
-  ),
-),
-    ],
-  ); */
 }
   AppBar _buildAppBar() {
     return AppBar(

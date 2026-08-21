@@ -43,7 +43,6 @@ dependencies:
   timeline_tile_nic: ^2.0.0
   firebase_core: ^3.13.0
   firebase_auth: ^5.5.3
-  cloud_firestore: ^5.6.7
   http: ^1.2.2
   pdf: ^3.10.7
   printing: ^5.11.0
