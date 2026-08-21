@@ -1,15 +1,13 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../repositories/contact_repository.dart';
 
 class SharedUserInfoBottomSheet extends StatefulWidget {
   final String contactId;
-  final String categoryId;
   final Map<String, dynamic> sharedUser;
 
   const SharedUserInfoBottomSheet({
     required this.contactId,
-    required this.categoryId,
     required this.sharedUser,
     Key? key,
   }) : super(key: key);
@@ -21,108 +19,30 @@ class SharedUserInfoBottomSheet extends StatefulWidget {
 
 class _SharedUserInfoBottomSheetState
     extends State<SharedUserInfoBottomSheet> {
-  late final String? userId;
   late final String? uidToRemove;
 
   @override
   void initState() {
     super.initState();
-    userId = FirebaseAuth.instance.currentUser?.uid;
     uidToRemove = widget.sharedUser['uid'];
   }
-Future<void> _removeSharedUser() async {
-  if (uidToRemove == null || userId == null) {
-    Navigator.of(context).pop("failed");
-    return;
-  }
 
-  if (uidToRemove == userId) {
-    Navigator.of(context).pop("failed");
-    return;
-  }
-  try {
-    // Step 1: Delete from sender's sharedWith
-    final sharedWithPath =
-        'users/$userId/categories/${widget.categoryId}/contacts/${widget.contactId}/sharedWith/$uidToRemove';
-    await FirebaseFirestore.instance.doc(sharedWithPath).delete();
-    debugPrint(" Deleted sharedWith doc from sender side: $sharedWithPath");
-
-    // Step 2: Delete reversed contact from any category of the receiver
-    final categoriesSnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uidToRemove)
-        .collection('categories')
-        .get();
-
-    bool foundAndDeleted = false;
-
-    for (var cat in categoriesSnapshot.docs) {
-      final contactsQuery = await cat.reference
-          .collection('contacts')
-          .where('originalContactId', isEqualTo: widget.contactId)
-          .get();
-
-      for (var doc in contactsQuery.docs) {
-        await doc.reference.delete();
-        debugPrint(" Deleted reversed contact from receiver side: ${doc.reference.path}");
-        foundAndDeleted = true;
-      }
-    }
-
-    if (!foundAndDeleted) {
-      debugPrint("️ No reversed contact found with originalContactId = ${widget.contactId}");
-    }
-
-    Navigator.of(context).pop("removed"); // Notify parent: success
-  } catch (e) {
-    debugPrint(" Error during access removal: $e");
-    Navigator.of(context).pop("failed"); // Notify parent: failure
-  }
-}
-
- /* Future<void> _removeSharedUser() async {
-    if (uidToRemove == null || userId == null) {
-      Navigator.of(context).pop("failed");
-      return;
-    }
-
-    if (uidToRemove == userId) {
+  Future<void> _removeSharedUser() async {
+    if (uidToRemove == null) {
       Navigator.of(context).pop("failed");
       return;
     }
 
     try {
-      // Delete from sender's sharedWith
-      final sharedWithPath =
-          'users/$userId/categories/${widget.categoryId}/contacts/${widget.contactId}/sharedWith/$uidToRemove';
-      await FirebaseFirestore.instance.doc(sharedWithPath).delete();
-      debugPrint(" Deleted sharedWith doc from sender side: $sharedWithPath");
-
-      // Delete reversed contact from receiver side
-      final receiverCategoryId =
-          widget.sharedUser['categoryId'] ?? widget.categoryId;
-
-      final reversedQuery = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uidToRemove)
-          .collection('categories')
-          .doc(receiverCategoryId)
-          .collection('contacts')
-          .where('originalContactId', isEqualTo: widget.contactId)
-          .get();
-
-      for (var doc in reversedQuery.docs) {
-        await doc.reference.delete();
-        debugPrint(
-            " Deleted reversed contact from receiver side: ${doc.reference.path}");
-      }
-
-      Navigator.of(context).pop("removed"); //  Signal success to parent
+      await ContactRepository.unshare(
+        contactId: widget.contactId,
+        sharedUserId: uidToRemove!,
+      );
+      Navigator.of(context).pop("removed");
     } catch (e) {
-      debugPrint(" Error during access removal: $e");
-      Navigator.of(context).pop("failed"); //  Signal failure to parent
+      Navigator.of(context).pop("failed");
     }
-  }*/
+  }
 
   @override
   Widget build(BuildContext context) {

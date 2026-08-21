@@ -1,221 +1,99 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
+import '../services/api_client.dart';
+
+/// Centralizes transaction access against the Laravel API
+/// (`/api/contacts/{contactId}/transactions`, `/api/transactions/{id}/...`).
+///
+/// `transactionStream` replaces the old Firestore `.snapshots()` listener with
+/// ~15s polling (confirmed acceptable trade-off - see migration plan §4).
 class TransactionService {
+  static const _pollInterval = Duration(seconds: 15);
+
   static Stream<List<Map<String, dynamic>>> transactionStream({
-    required String uid,
-    required String categoryId,
     required String contactId,
-    bool filterAccepted = false,
+    String? status,
   }) {
-    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .doc(categoryId)
-        .collection('contacts')
-        .doc(contactId)
-        .collection('transactions');
+    late final StreamController<List<Map<String, dynamic>>> controller;
+    Timer? timer;
 
-    if (filterAccepted) {
-      query = query.where('status', isEqualTo: 'accepted');
-    }
-    return query
-        .orderBy('date', descending: true)
-        .limit(20)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-
-        String finalType = data['type'] ?? '';
-        if (filterAccepted) {
-          if (finalType == "Send") {
-            finalType = "Receive";
-          } else if (finalType == "Receive") {
-            finalType = "Send";
-          }
-        }
-        return {
-          'id': doc.id,
-          'date': (data['date'] as Timestamp).toDate(),
-          'type': data['type'],
-          'credit': data['credit'] ?? 0,
-          'note': data['note'] ?? '',
-          'status': data['status'] ?? '',
-        };
-      }).toList();
-    });
-  }
-
-  static Future<DocumentReference<Map<String, dynamic>>> createSenderTransaction({
-    required String currentUserId,
-    required String categoryId,
-    required String contactId,
-    String? sharedUserId,
-    String? sharedCategoryId,
-    String? receiverContactId,
-    required Map<String, dynamic> transaction,
-  }) async {
-    // Add to Sender's Transactions
-    final senderTxnRef = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUserId)
-        .collection('categories')
-        .doc(categoryId)
-        .collection('contacts')
-        .doc(contactId)
-        .collection('transactions')
-        .add({
-      'date': transaction['date'],
-      'type': transaction['type'],
-      'credit': transaction['credit'],
-      'note': transaction['note'] ?? "",
-      'timestamp': FieldValue.serverTimestamp(),
-
-      // Sender info
-      'transactionId': '',
-      'userId': currentUserId,
-      'senderId': currentUserId,
-      'senderCategoryId': categoryId,
-      'senderContactId': contactId,
-
-      // Receiver info
-      'receiverUserId': sharedUserId,
-      'receiverCategoryId': sharedCategoryId,
-      'receiverContactId': receiverContactId,
-
-      // Shared structure
-      'sharedUserId': null,
-      'sharedCategoryId': categoryId,
-      'status': 'pending',
-    });
-    //  transactionId update
-    await senderTxnRef.update({'transactionId': senderTxnRef.id});
-
-    return senderTxnRef;
-  }
-
-  static Future<void> fanOutToSharedUsers({
-    required String currentUserId,
-    required String categoryId,
-    required String contactId,
-    required DocumentReference<Map<String, dynamic>> senderTxnRef,
-    required Map<String, dynamic> transaction,
-  }) async {
-    final senderSnap = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUserId)
-        .get();
-
-    final senderName = senderSnap.data()?['name'] ?? 'Unknown';
-
-    //  Loop over all shared users → Add to PENDING + Notification
-    final sharedWithSnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUserId)
-        .collection('categories')
-        .doc(categoryId)
-        .collection('contacts')
-        .doc(contactId)
-        .collection('sharedWith')
-        .get();
-
-    // helper function to reverse type
-    String reversedType(String type) {
-      return type == 'Send' ? 'Receive' : 'Send';
-    }
-
-    for (var doc in sharedWithSnapshot.docs) {
-      final sharedUserId = doc['uid'];
-      final sharedCategoryId = doc['categoryId']; //accept k lye
-      final receiverContactId = doc['receiverContactId'];
-      //  Add to PENDING (receiver side)
-      // Make a doc with ID first
-      final pendingRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(sharedUserId)
-          .collection('categories')
-          .doc(sharedCategoryId)
-          .collection('contacts')
-          .doc(receiverContactId)
-          .collection('transactions')
-          .doc();
-
-      // Create transaction data
-      final pendingData = {
-        'transactionId': pendingRef.id, //  already available
-        'date': transaction['date'],
-        'type': reversedType(transaction['type']),
-        'typeOriginal': transaction['type'],
-        'credit': transaction['credit'],
-        'userId': sharedUserId,
-        'senderId': currentUserId,
-        'sharedCategoryId': sharedCategoryId,
-        'receiverContactId': receiverContactId,
-        'receiverCategoryId': sharedCategoryId,
-        'sharedUserId': sharedUserId,
-        'status': 'pending',
-        'senderTransactionId': senderTxnRef.id,
-        'senderCategoryId': categoryId,
-        'senderContactId': contactId,
-      };
-      await pendingRef.set(pendingData);
-
-      await pendingRef.update({'transactionId': pendingRef.id});
-
-      //  Add Notification (receiver side, senderName)
-      String notificationBody;
-
-      if (transaction['type'].toString().toLowerCase() == 'send') {
-        notificationBody = 'You received Rs.${transaction['credit']} from $senderName.';
-      } else if (transaction['type'].toString().toLowerCase() == 'receive') {
-        notificationBody = 'You sent Rs.${transaction['credit']} to $senderName.';
-      } else {
-        notificationBody = 'Transaction of Rs.${transaction['credit']} with $senderName.';
+    Future<void> tick() async {
+      try {
+        controller.add(await _fetchTransactions(contactId: contactId, status: status));
+      } catch (_) {
+        // Preserves the existing resilience style used throughout the repositories:
+        // swallow and let the next poll retry rather than surfacing a stream error.
       }
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(sharedUserId)
-          .collection('notifications')
-          .add({
-        'title': 'Payment Request',
-        'body': notificationBody,
-        'timestamp': Timestamp.now(),
-        'isRead': false,
-        'type': 'transaction_request',
-        'transactionId': pendingRef.id,
-        'pendingTransactionId': pendingRef.id,
-        'sharedCategoryId': sharedCategoryId,
-        'receiverContactId': receiverContactId,
-        'senderId': currentUserId,
-        'senderName': senderName,
-        'senderTransactionId': senderTxnRef.id,
-        'senderCategoryId': categoryId,
-        'senderContactId': contactId,
-        'receiverCategoryId': sharedCategoryId,
-      });
     }
+
+    controller = StreamController<List<Map<String, dynamic>>>(
+      onListen: () {
+        tick();
+        timer = Timer.periodic(_pollInterval, (_) => tick());
+      },
+      onCancel: () => timer?.cancel(),
+    );
+
+    return controller.stream;
   }
 
-  // Not called from any UI yet — no delete-transaction feature exists in the
-  // app today. Carried over unwired from the original file (Phase 2 cleanup).
-  static Future<void> deleteTransaction({
-    required String uid,
-    required String categoryId,
+  static Future<List<Map<String, dynamic>>> _fetchTransactions({
     required String contactId,
-    required String transactionId,
+    String? status,
   }) async {
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .doc(categoryId)
-        .collection('contacts')
-        .doc(contactId)
-        .collection('transactions')
-        .doc(transactionId)
-        .delete();
+    final data = await ApiClient.instance.get(
+      '/contacts/$contactId/transactions',
+      query: {if (status != null) 'status': status, 'limit': '100'},
+    ) as Map<String, dynamic>;
+
+    final items = (data['data'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return items.map(_parseTransaction).toList();
+  }
+
+  static Map<String, dynamic> _parseTransaction(Map<String, dynamic> json) {
+    return {
+      'id': json['id'],
+      'date': DateTime.parse(json['date'] as String),
+      'type': json['type'],
+      'credit': double.tryParse(json['credit'].toString()) ?? 0.0,
+      'note': json['note'] ?? '',
+      'status': json['status'] ?? '',
+      'sender_transaction_id': json['sender_transaction_id'],
+    };
+  }
+
+  static Future<Map<String, dynamic>> addTransaction({
+    required String contactId,
+    required DateTime date,
+    required String type,
+    required double credit,
+    String? note,
+  }) async {
+    final data = await ApiClient.instance.post('/contacts/$contactId/transactions', body: {
+      'date': date.toIso8601String().split('T').first,
+      'type': type,
+      'credit': credit,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+    return data as Map<String, dynamic>;
+  }
+
+  static Future<void> updateNote({required String transactionId, required String note}) async {
+    await ApiClient.instance.patch('/transactions/$transactionId/note', body: {'note': note});
+  }
+
+  static Future<void> acceptTransaction(String transactionId) async {
+    await ApiClient.instance.post('/transactions/$transactionId/accept');
+  }
+
+  static Future<void> rejectTransaction(String transactionId) async {
+    await ApiClient.instance.post('/transactions/$transactionId/reject');
+  }
+
+  // Not called from any UI yet - carried over unwired from the original
+  // Firestore version (no delete-transaction feature exists in the app today).
+  static Future<void> deleteTransaction(String transactionId) async {
+    await ApiClient.instance.delete('/transactions/$transactionId');
   }
 
   static double calculateBalance(List<Map<String, dynamic>> txns) {

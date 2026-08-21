@@ -1,6 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:hisabshare/repositories/contact_repository.dart';
 
 class AddContactPage extends StatefulWidget {
   final String categoryId;
@@ -22,45 +21,26 @@ class _AddContactPageState extends State<AddContactPage> {
   String? selectedCategory;
 
   void _submitTask() async {
-  if (_formKey.currentState!.validate()) {
-    final newContact = {
-      'name': nameController.text.trim(),
-      'mobileNo': mobileNoController.text.trim(),
-      'email': emailController.text.trim(),
-      'address': addressController.text.trim(),
-      'category': widget.categoryName,
-      //'category': selectedCategory,
-      ///
-      'createdAt': Timestamp.now(),
-    };
-
-    try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) {
-        final contactDocRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('categories')
-            .doc(widget.categoryId)
-           // .doc(selectedCategory)
-            .collection('contacts')
-           //.doc(nameController.text.trim());
-             .doc();
-
-        // Store contact info
-       await contactDocRef.set(newContact);
+    if (_formKey.currentState!.validate()) {
+      try {
+        final newContact = await ContactRepository.addContact(
+          categoryId: widget.categoryId,
+          name: nameController.text.trim(),
+          mobileNo: mobileNoController.text.trim(),
+          email: emailController.text.trim(),
+          address: addressController.text.trim(),
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Contact added successfully!')),
         );
+        Navigator.pop(context, newContact);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add contact: $e')),
+        );
       }
-      Navigator.pop(context, newContact);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add contact: $e')),
-      );
     }
   }
-}
 
   @override
   void dispose() {

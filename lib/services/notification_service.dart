@@ -1,5 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import '../repositories/notification_repository.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -8,7 +9,7 @@ class NotificationService {
 
   NotificationService._internal();
 
-  /// Save notification to Firestore and optionally show a banner
+  /// Save notification via the API and optionally show a banner.
   Future<void> showNotification({
     required String title,
     required String body,
@@ -16,19 +17,8 @@ class NotificationService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Save notification in Firestore
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('notifications')
-        .add({
-      'title': title,
-      'body': body,
-      'timestamp': Timestamp.now(),
-      'isRead': false,
-    });
+    await NotificationRepository.create(title: title, body: body);
 
-    
     _showInAppBanner(title: title, body: body);
   }
 

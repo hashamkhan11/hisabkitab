@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -9,38 +8,27 @@ import 'package:hisabshare/widgets/shareduser_infopage.dart';
 import 'package:hisabshare/screens/list.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hisabshare/repositories/contact_repository.dart';
-import 'dart:async';
 
 class DetailPage extends StatefulWidget {
-  final String categoryId; 
+  final String categoryId;
   final String categoryName;
- 
-  const DetailPage({required this.categoryId,required this.categoryName,
+
+  const DetailPage({required this.categoryId, required this.categoryName,
   Key? key}) : super(key: key);
- 
+
     @override
     State<DetailPage> createState() => _DetailPageState();
   }
 
-  Map<String, String> contact =  Map<String, String>();
-  
   class _DetailPageState extends State<DetailPage> {
     late String userId;
     TextEditingController searchController = TextEditingController();
-    
+
     List<Map<String, dynamic>> persons = [];
     List<Map<String, dynamic>> filteredPersons = [];
     double totalSend = 0.0;
     double totalReceive = 0.0;
-    List<StreamSubscription> _contactSubscriptions = [];
     double _fabOffsetX = 0.0;
-
-  void dispose() {
-      for (var sub in _contactSubscriptions) {
-        sub.cancel();
-      }
-      super.dispose();
-    }
 
   @override
   void initState() {
@@ -49,7 +37,6 @@ class DetailPage extends StatefulWidget {
     _loadContacts();
     _handleInitialDynamicLink();
     _listenToDynamicLinks();
-    _listenToContactTransactions();
   userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 WidgetsBinding.instance.addPostFrameCallback((_) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -62,25 +49,25 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
  void _handleInitialDynamicLink() async {
   final PendingDynamicLinkData? initialLink =
       await FirebaseDynamicLinks.instance.getInitialLink();
- 
+
   if (initialLink?.link != null) {
     _navigateFromSharedLink(initialLink!.link);
   }
 }
- 
+
 void _listenToDynamicLinks() {
   FirebaseDynamicLinks.instance.onLink.listen((dynamicLinkData) {
     _navigateFromSharedLink(dynamicLinkData.link);
   }).onError((error) {
   });
 }
- 
+
 void _navigateFromSharedLink(Uri uri) {
   if (uri.pathSegments.length >= 3 && uri.pathSegments[0] == 'contact') {
     final contactId = uri.pathSegments[1];
     final contactName = Uri.decodeComponent(uri.pathSegments[2]);
     final senderUserId = uri.queryParameters['senderId'] ?? '';
- 
+
     // Navigate using GoRouter instead of Navigator
     GoRouter.of(context).go(
       '/contact/$contactId/${Uri.encodeComponent(contactName)}?senderId=$senderUserId',
@@ -116,105 +103,6 @@ void _navigateFromSharedLink(Uri uri) {
     ),
   );
 }
-void _listenToContactTransactions() async {
-  final uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null) return;
-
-  // Cancel previous listeners
-  for (var sub in _contactSubscriptions) {
-    await sub.cancel();
-  }
-  _contactSubscriptions.clear();
-
-  final contactsSnapshot = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .collection('categories')
-      .doc(widget.categoryId)
-      .collection('contacts')
-      .get();
-
-  for (var contactDoc in contactsSnapshot.docs) {
-    final contactId = contactDoc.id;
-
-    final sub = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .doc(widget.categoryId)
-        .collection('contacts')
-        .doc(contactId)
-        .collection('transactions')
-        .snapshots()
-        .listen((snapshot) {
-      double send = 0.0;
-      double receive = 0.0;
-
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final amount = (data['credit'] ?? 0).toDouble();
-        final type = data['type'];
-
-        if (type == 'Send') {
-          send += amount;
-        } else if (type == 'Receive') {
-          receive += amount;
-        }
-      }
-
-      //Instead of replacing, re-calculate everything
-      _recalculateAllTransactions();
-    });
-
-    _contactSubscriptions.add(sub);
-  }
-}
-void _recalculateAllTransactions() async {
-  final uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null) return;
-
-  double newSend = 0.0;
-  double newReceive = 0.0;
-
-  final contactsSnapshot = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .collection('categories')
-      .doc(widget.categoryId)
-      .collection('contacts')
-      .get();
-
-  for (var contactDoc in contactsSnapshot.docs) {
-    final contactId = contactDoc.id;
-
-    final txnsSnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .doc(widget.categoryId)
-        .collection('contacts')
-        .doc(contactId)
-        .collection('transactions')
-        .get();
-
-    for (var doc in txnsSnapshot.docs) {
-      final data = doc.data();
-      final amount = (data['credit'] ?? 0).toDouble();
-      final type = data['type'];
-
-      if (type == 'Send') {
-        newSend += amount;
-      } else if (type == 'Receive') {
-        newReceive += amount;
-      }
-    }
-  }
-
-  setState(() {
-    totalSend = newSend;
-    totalReceive = newReceive;
-  });
-}
 
   void _filterPersons() {
     setState(() {
@@ -225,7 +113,7 @@ void _recalculateAllTransactions() async {
           .toList();
     });
   }
- 
+
   Color _getRandomCardColor() {
     final random = Random();
     return Color.fromARGB(
@@ -236,137 +124,63 @@ void _recalculateAllTransactions() async {
     );
   }
 
-//void _loadContacts() async {
+  /// Loads contacts (with server-computed `balance`/`total_receive`/`total_send`
+  /// per contact - see ContactController::index) and derives the category-wide
+  /// Send/Receive summary cards by summing across the list, replacing the old
+  /// per-contact realtime-listener recalculation.
   Future<void> _loadContacts() async {
-  final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
-  if (currentUserUid == null) return;
-
   final List<Map<String, dynamic>> loaded = [];
 
-  final snapshot = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(currentUserUid)
-      .collection('categories')
-      .doc(widget.categoryId)
-      .collection('contacts')
-      .get();
+  final contacts = await ContactRepository.listContacts(widget.categoryId);
 
-  final docs = snapshot.docs;
-
-  //  Fast balance fetch in parallel
-  final balances = await Future.wait(docs.map((doc) async {
-    return await _fetchBalance(currentUserUid, doc.id);
-  }));
-
-  for (int i = 0; i < docs.length; i++) {
-    final doc = docs[i];
-    final data = doc.data();
-    final contactId = doc.id;
+  for (final data in contacts) {
+    final contactId = data['id'] as String;
     final name = data['name'] as String?;
     if (name == null) continue;
 
-    final balance = balances[i];
+    final isSharedView = data['is_shared_view'] == true;
 
-    //  Reversed Shared Contact (Receiver Side)
-    if (data['isSharedView'] == true &&
-        data['sharedUserId'] != null &&
-        data['sharedCategoryId'] != null) {
-      loaded.add({
-        'id': contactId,
-        'name': name,
-        'amount': balance,
-        'color': _getRandomCardColor(),
-        'mobileNo': data['mobileNo'] ?? '',
-        'email': data['email'] ?? '',
-        'address': data['address'] ?? '',
-        'isSharedView': true,
-        'sharedUserId': data['sharedUserId'],
-        'sharedCategoryId': data['sharedCategoryId'],
-        'originalContactId': data['originalContactId'],
-        'sharedBy': data['sharedBy'] ?? {},
-      });
-    } else {
-      //  Normal Contact (Sender Side)
-      Map<String, dynamic>? sharedUser;
-
-      //  Safer check (default true if field missing)
-      if (data['hasSharedWith'] ?? true) {
-        final sharedSnapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUserUid)
-            .collection('categories')
-            .doc(widget.categoryId)
-            .collection('contacts')
-            .doc(contactId)
-            .collection('sharedWith')
-            .get();
-
-        if (sharedSnapshot.docs.isNotEmpty) {
-          final firstShared = sharedSnapshot.docs.first;
-          final sharedData = firstShared.data();
+    //  Avatar for sender side: who this (non-shared) contact has been shared with.
+    Map<String, dynamic>? sharedUser;
+    if (!isSharedView) {
+      final shares = await ContactRepository.shares(contactId);
+      if (shares.isNotEmpty) {
+        final sharedWithUser = shares.first['shared_with_user'] as Map<String, dynamic>?;
+        if (sharedWithUser != null) {
           sharedUser = {
-            'uid': sharedData['uid'],
-            'username': sharedData['name'] ?? '',
-            'email': sharedData['email'] ?? '',
-            'imageUrl': sharedData['imageUrl'] ?? '',
-            'mobileNo': sharedData['mobileNo'] ?? '',
+            'uid': sharedWithUser['id'],
+            'username': sharedWithUser['username'] ?? '',
+            'email': sharedWithUser['email'] ?? '',
+            'imageUrl': sharedWithUser['image_url'] ?? '',
+            'mobileNo': sharedWithUser['mobile_no'] ?? '',
           };
-        }else {
-}
+        }
       }
-     
-      loaded.add({
-        'id': contactId,
-        'name': name,
-        'amount': balance,
-        'color': _getRandomCardColor(),
-        'mobileNo': data['mobileNo'] ?? '',
-        'email': data['email'] ?? '',
-        'address': data['address'] ?? '',
-        'isSharedView': false,
-        'sharedUserId': null,
-        if (sharedUser != null) 'sharedUser': sharedUser, //  Avatar for sender side
-      });
     }
+
+    loaded.add({
+      'id': contactId,
+      'name': name,
+      'amount': (data['balance'] as num?)?.toDouble() ?? 0.0,
+      'totalReceive': (data['total_receive'] as num?)?.toDouble() ?? 0.0,
+      'totalSend': (data['total_send'] as num?)?.toDouble() ?? 0.0,
+      'color': _getRandomCardColor(),
+      'mobileNo': data['mobile_no'] ?? '',
+      'email': data['email'] ?? '',
+      'address': data['address'] ?? '',
+      'isSharedView': isSharedView,
+      if (sharedUser != null) 'sharedUser': sharedUser,
+    });
   }
-  // Update state
+
   setState(() {
     persons = loaded;
     filteredPersons = List.from(loaded);
+    totalReceive = loaded.fold(0.0, (sum, p) => sum + (p['totalReceive'] as double));
+    totalSend = loaded.fold(0.0, (sum, p) => sum + (p['totalSend'] as double));
   });
 }
 
-  void _addContact(Map<String, dynamic> newContact) async {
-    final generatedId = await ContactRepository.addContact(
-      categoryId: widget.categoryId,
-      categoryName: widget.categoryName,
-      newContact: newContact,
-    );
-
-    if (generatedId != null) {
-      final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-      final balance = await _fetchBalance(uid, generatedId);
-
-      final newPerson = {
-        'id': generatedId,
-        'name': newContact['name'],
-        'amount': balance,
-        'color': _getRandomCardColor(),
-        'mobileNo': newContact['mobileNo'] ?? '',
-        'email': newContact['email'] ?? '',
-        'address': newContact['address'] ?? '',
-      };
- 
-      setState(() {
-        persons.add(newPerson);
-        filteredPersons = List.from(persons);
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid contact data.')),
-      );
-    }
-  }
   void _deleteContact(String contactId) async {
     showDialog(
       context: context,
@@ -380,15 +194,20 @@ void _recalculateAllTransactions() async {
           ),
           TextButton(
             onPressed: () async {
-              await ContactRepository.deleteContact(
-                categoryId: widget.categoryId,
-                contactId: contactId,
+              await ContactRepository.deleteContact(contactId);
+
+              final removed = persons.firstWhere(
+                (p) => p['id'] == contactId,
+                orElse: () => <String, dynamic>{},
               );
+
               setState(() {
                 persons.removeWhere((p) => p['id'] == contactId);
                 filteredPersons.removeWhere((p) => p['id'] == contactId);
+                totalReceive -= (removed['totalReceive'] as double?) ?? 0.0;
+                totalSend -= (removed['totalSend'] as double?) ?? 0.0;
               });
- 
+
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Contact deleted")),
@@ -400,35 +219,9 @@ void _recalculateAllTransactions() async {
       ),
     );
   }
- 
-  Future<double> _fetchBalance(String uid, String contactId) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .doc(widget.categoryId)
-        .collection('contacts')
-        .doc(contactId)
-        .collection('transactions')
-        .get();
- 
-    double balance = 0.0;
-    for (var doc in snapshot.docs) {
-      final data = doc.data(); 
-      final credit = (data['credit'] ?? 0).toDouble();
-      final type = data['type'];
- 
-      if (type == 'Receive') {
-        balance += credit;
-      } else if (type == 'Send') {
-        balance -= credit;
-      }
-    }
-    return balance;
-  }
+
    @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
   return Scaffold(
 
       backgroundColor: Colors.white,
@@ -479,7 +272,7 @@ void _recalculateAllTransactions() async {
                 border: Border.all(color: Colors.black, width: 1),
                 borderRadius: BorderRadius.circular(30),
               ),
-              
+
                child: Row(
                 children: [
                   Expanded(
@@ -506,102 +299,45 @@ void _recalculateAllTransactions() async {
             const SizedBox(height: 10),
             Expanded(
           child: RefreshIndicator(
-    onRefresh: _loadContacts,    
+    onRefresh: _loadContacts,
   child: ListView.builder(
     itemCount: filteredPersons.length,
     itemBuilder: (context, index) {
       final person = filteredPersons[index];
       final isPositive = (person['amount'] ?? 0) >= 0;
-      final sharedUser = person['sharedUser']; 
+      final sharedUser = person['sharedUser'];
       return GestureDetector(
         onLongPress: () => _deleteContact(person['id']),
         child: Stack(
           children: [
-            if (filteredPersons.isNotEmpty)
-              /*Positioned(
-                left: 25,
-                top: 0,
-                bottom: 0,
-                child: Container(
-                  width: 2,
-                  height: 80,
-                  color: Colors.black,
-                ),
-              ),*/
             Padding(
-             //  padding: const EdgeInsets.only(left: 40, bottom: 16),
              padding: const EdgeInsets.only(bottom: 16),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Remove dot from cards
-                 /* Container(
-                    margin: const EdgeInsets.only(right: 12, top: 8),
-                    width: 12,
-                    height: 12,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black,
-                    ),
-                  ),*/
-                  
                   Expanded(
                     child: GestureDetector(
     onTap: () async {
       final isSharedView = person['isSharedView'] == true;
-      final sharedUserId = person['sharedUserId'] ?? '';
-      final sharedCategoryId = person['sharedCategoryId'];
-      final correctCategoryId = isSharedView ? sharedCategoryId : widget.categoryId;
-
       final contactId = person['id'];
-
-      String? receiverCategoryId;
-      if (isSharedView && sharedUserId.isNotEmpty && sharedCategoryId != null) {
-        final snap = await FirebaseFirestore.instance
-            .collection("users")
-            .doc(sharedUserId) // sender user
-            .collection("categories")
-            .doc(sharedCategoryId) // sender category
-            .collection("contacts")
-            .doc(person['originalContactId']) // original sender ka contact
-            .collection("sharedWith")
-            .doc(FirebaseAuth.instance.currentUser!.uid) // current receiver
-            .get();
-
-        if (snap.exists) {
-          receiverCategoryId = snap.data()?['categoryId'];
-        } else {
-        }
-      }
 
       if (contactId != null && person['name'] != null) {
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => ContactDetailPage(
-              categoryId: correctCategoryId,
+              categoryId: widget.categoryId,
               contactId: contactId,
               contactName: person['name'],
               isSharedView: isSharedView,
-              sharedUserId: sharedUserId,
-              sharedCategoryId: sharedCategoryId,
-              receiverContactId: contactId,
-              originalContactId: person['originalContactId'],
-              receiverCategoryId: receiverCategoryId,
-             // currentUserName: person['currentUserName'],
             ),
           ),
         );
- 
-                          if (uid != null) {
-                            final updatedBalance =
-                                await _fetchBalance(uid, person['id']);
-                            setState(() {
-                              person['amount'] = updatedBalance;
-                            });
-                          }
-                        } else {
-                        }
+
+        // Balances are server-computed now, so a full reload after returning
+        // keeps this contact's (and the summary cards') totals in sync.
+        _loadContacts();
+      }
                       },
                       child: Container(
                         padding: const EdgeInsets.all(12),
@@ -625,15 +361,6 @@ void _recalculateAllTransactions() async {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    //
-                                  /*  const Text(
-                                      'Balance',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 14,
-                                      ),
-                                    ), */
-                                    //
                                     Text(
                                       person['amount']
                                           .toStringAsFixed(2),
@@ -651,24 +378,10 @@ void _recalculateAllTransactions() async {
 if (sharedUser != null)
   GestureDetector(
     onTap: () async {
-      if (sharedUser['contactId'] == null) {
-      } else {
-      }
-
-/*showDialog(
-      context: context,
-      builder: (context) => SharedUserInfoBottomSheet(
-        contactId: person['id'],
-        categoryId: widget.categoryId,
-        sharedUser: sharedUser,
-       // scaffoldContext: context,
-        
-      ),);*/
       final result = await showDialog(
   context: context,
   builder: (context) => SharedUserInfoBottomSheet(
     contactId: person['id'],
-    categoryId: widget.categoryId,
     sharedUser: sharedUser,
   ),
 );
@@ -695,48 +408,6 @@ if (result == "removed") {
       : null,
 ),
   ),
-  if (person['isSharedView'] == true && person['sharedBy'] != null)
-      GestureDetector(
-        onTap: () {
-          final sharedBy = person['sharedBy'];
-          showDialog(
-  context: context,
-  builder: (BuildContext dialogContext) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Shared By'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('👤 Name: ${sharedBy['name'] ?? 'N/A'}'),
-          Text('📧 Email: ${sharedBy['email'] ?? 'N/A'}'),
-          Text('📞 Phone: ${sharedBy['mobileNo'] ?? 'N/A'}'),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext), //  Use dialogContext
-          child: const Text('Close'),
-        ),
-      ],
-    );
-  },
-);
-        },
-        child: CircleAvatar(
-          radius: 16,
-          backgroundColor: Colors.grey.shade600,
-          backgroundImage: (person['sharedBy']['imageUrl'] != null &&
-                  person['sharedBy']['imageUrl'].toString().isNotEmpty)
-              ? NetworkImage(person['sharedBy']['imageUrl'] as String)
-              : null,
-          child: (person['sharedBy']['imageUrl'] == null ||
-                  person['sharedBy']['imageUrl'].toString().isEmpty)
-              ? const Icon(Icons.person, size: 16, color: Colors.white)
-              : null,
-        ),
-      ),
 
                               ],
                             ),
@@ -760,24 +431,6 @@ if (result == "removed") {
         ),
       ),
       ),
-     /*floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.lightGreen,
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AddContactPage(categoryId: widget.categoryId, categoryName: widget.categoryName,),
-            ),
-          );
-          if (result != null && result is Map<String, dynamic> && result['name'] != null) {
-          //  _addContact(result);
-            _loadContacts();
-          } else {
-            debugPrint("Invalid contact data: $result");
-          }
-        },
-        child: const Icon(Icons.add, color: Colors.black),
-      ),*/
 
 floatingActionButton: Align(
   alignment: Alignment.bottomLeft,

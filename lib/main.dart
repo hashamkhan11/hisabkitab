@@ -40,14 +40,11 @@ class MyApp extends StatelessWidget {
     final senderUserId = state.uri.queryParameters['senderId'];
 
     return ContactDetailPage(
-     categoryId: categoryId ?? '',
+      categoryId: categoryId ?? '',
       contactId: contactId,
       contactName: contactName,
-      //isSharedView: senderUserId.isNotEmpty,
-       isSharedView: senderUserId != null && senderUserId.isNotEmpty,
-     // sharedUserId: senderUserId ?? '',
-       sharedUserId: senderUserId ?? '',
-        
+      isSharedView: senderUserId != null && senderUserId.isNotEmpty,
+      sharedUserId: senderUserId,
     );
   },
 ),

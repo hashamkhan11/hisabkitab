@@ -1,122 +1,15 @@
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:hisabshare/repositories/notification_repository.dart';
+import 'package:hisabshare/services/transaction_service.dart';
 
 class NotificationPage extends StatelessWidget {
   final VoidCallback onBackToHome;
 
   const NotificationPage({required this.onBackToHome, Key? key}) : super(key: key);
 
-  Future<void> acceptTransaction(Map<String, dynamic> data, String docId) async {
-    final receiverId = FirebaseAuth.instance.currentUser!.uid;
-
-    try {
-      if (data['transactionId'] == null || (data['transactionId'] as String).isEmpty) {
-        return; // function yahin se exit ho jayega
-      }
-      final String receiverCategoryId = data['receiverCategoryId'];
-      final String receiverContactId = data['receiverContactId'];
-      final String senderId = data['senderId'];
-      final String senderTransactionId = data['senderTransactionId'];
-      final String senderCategoryId = data['senderCategoryId'];
-      final String senderContactId = data['senderContactId'];
-
-      //  Update receiver’s transaction status
-      final receiverTxnRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(receiverId)
-          .collection('categories')
-          .doc(receiverCategoryId)
-          .collection('contacts')
-          .doc(receiverContactId)
-          .collection('transactions')
-          .doc(data['transactionId']);
-
-      await receiverTxnRef.update({'status': 'accepted'});
-
-      //  Update sender’s transaction status
-      final senderTxnRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(senderId)
-          .collection('categories')
-          .doc(senderCategoryId)
-          .collection('contacts')
-          .doc(senderContactId)
-          .collection('transactions')
-          .doc(senderTransactionId);
-
-      await senderTxnRef.update({'status': 'accepted'});
-
-      //  Update notification
-      final notificationRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(receiverId)
-          .collection('notifications')
-          .doc(docId);
-
-      await notificationRef.update({
-        'isRead': true,
-        'status': 'accepted',
-        'resolvedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (_) {
-    }
-  }
-  Future<void> rejectTransaction(Map<String, dynamic> data) async {
-    try {
-      final pendingId = data['pendingTransactionId'];
-      final senderTransactionId = data['senderTransactionId'];
-      final senderId = data['senderId'];
-      final senderCategoryId = data['senderCategoryId'];
-      final senderContactId = data['senderContactId'];
-
-      // 1) Update pendingTransaction status → rejected
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid) // receiver
-          .collection('categories')
-          .doc(data['receiverCategoryId'])
-          .collection('contacts')
-          .doc(data['receiverContactId'])
-          .collection('pendingTransactions')
-          .doc(pendingId)
-          .update({'status': 'rejected'});
-
-      // 2) Update sender’s transaction → rejected
-      if (senderTransactionId != null &&
-          senderCategoryId != null &&
-          senderContactId != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(senderId) // sender user
-            .collection('categories')
-            .doc(senderCategoryId)
-            .collection('contacts')
-            .doc(senderContactId)
-            .collection('transactions')
-            .doc(senderTransactionId)
-            .update({'status': 'rejected'});
-      }
-
-    } catch (_) {
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('User not logged in')),
-      );
-    }
-
-    final userId = user.uid;
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -131,13 +24,13 @@ class NotificationPage extends StatelessWidget {
             tooltip: 'Mark all as read',
             icon: const Icon(Icons.done_all, color: Colors.white),
             onPressed: () async {
-              await NotificationRepository.markAllRead(userId);
+              await NotificationRepository.markAllRead();
             },
           ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: NotificationRepository.notificationsStream(userId),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: NotificationRepository.notificationsStream(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return const Center(child: Text('Error loading notifications'));
@@ -147,9 +40,9 @@ class NotificationPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final docs = snapshot.data?.docs ?? [];
+          final items = snapshot.data ?? [];
 
-          if (docs.isEmpty) {
+          if (items.isEmpty) {
             return const Center(
               child: Text(
                 'No notifications yet!',
@@ -159,18 +52,18 @@ class NotificationPage extends StatelessWidget {
           }
 
           return ListView.builder(
-            itemCount: docs.length,
+            itemCount: items.length,
             itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              final docId = docs[index].id;
+              final data = items[index];
+              final id = data['id'] as String;
               final title = data['title'] ?? 'No Title';
               final body = data['body'] ?? 'No Body';
-              final timestamp = data['timestamp'] as Timestamp?;
-              final time = timestamp != null
-                  ? DateFormat('MMM d, yyyy • hh:mm a').format(timestamp.toDate())
+              final createdAt = data['created_at'] as String?;
+              final time = createdAt != null
+                  ? DateFormat('MMM d, yyyy • hh:mm a').format(DateTime.parse(createdAt))
                   : '';
 
-              final isRead = data['isRead'] == true;
+              final isRead = data['is_read'] == true;
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -182,7 +75,7 @@ class NotificationPage extends StatelessWidget {
                 child: ListTile(
                   onTap: () async {
                     if (!isRead) {
-                      await docs[index].reference.update({'isRead': true});
+                      await NotificationRepository.markRead(id);
                     }
                   },
                   leading: Icon(
@@ -205,28 +98,27 @@ class NotificationPage extends StatelessWidget {
                       Text(body, style: TextStyle(color: Colors.black.withOpacity(0.8))),
                       const SizedBox(height: 4),
                       Text(time, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                       if (data['type'] == 'transaction_request') ...[
+                      if (data['type'] == 'transaction_request') ...[
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             TextButton(
                               onPressed: () async {
-                                await acceptTransaction(data, docId);
+                                final transactionId = data['transaction_id'] as String?;
+                                if (transactionId == null) return;
+                                try {
+                                  await TransactionService.acceptTransaction(transactionId);
+                                } catch (_) {}
                               },
                               child: const Text("Accept", style: TextStyle(color: Colors.black)),
                             ),
-
                             TextButton(
                               onPressed: () async {
-                                //  only call rejectTransaction
-                                await rejectTransaction(data);
-
-                                // update notification doc only
-                                await docs[index].reference.update({
-                                  'isRead': true,
-                                  'status': 'rejected',
-                                  'message': 'You rejected transaction request',
-                                });
+                                final transactionId = data['transaction_id'] as String?;
+                                if (transactionId == null) return;
+                                try {
+                                  await TransactionService.rejectTransaction(transactionId);
+                                } catch (_) {}
                               },
                               child: const Text("Reject", style: TextStyle(color: Colors.red)),
                             )
@@ -244,4 +136,3 @@ class NotificationPage extends StatelessWidget {
     );
   }
 }
-
