@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../services/api_client.dart';
+import '../services/local_cache.dart';
+import '../services/polling.dart';
 
 /// Centralizes notification access against the Laravel API (`/api/notifications`).
 ///
@@ -8,30 +10,23 @@ import '../services/api_client.dart';
 /// ~15s polling (confirmed acceptable trade-off - see migration plan §4).
 class NotificationRepository {
   static const _pollInterval = Duration(seconds: 15);
+  static const _cacheKey = 'notifications';
 
   static Stream<List<Map<String, dynamic>>> notificationsStream() {
-    late final StreamController<List<Map<String, dynamic>>> controller;
-    Timer? timer;
-
-    Future<void> tick() async {
-      try {
+    return pollingStream(
+      interval: _pollInterval,
+      fetch: () async {
         final data = await ApiClient.instance.get('/notifications') as List<dynamic>;
-        controller.add(data.cast<Map<String, dynamic>>());
-      } catch (_) {
-        // Preserves the existing resilience style used throughout the repositories:
-        // swallow and let the next poll retry rather than surfacing a stream error.
-      }
-    }
-
-    controller = StreamController<List<Map<String, dynamic>>>(
-      onListen: () {
-        tick();
-        timer = Timer.periodic(_pollInterval, (_) => tick());
+        final items = data.cast<Map<String, dynamic>>();
+        unawaited(LocalCache.putJson(_cacheKey, items));
+        return items;
       },
-      onCancel: () => timer?.cancel(),
+      initialValue: () async {
+        final cached = await LocalCache.getJson(_cacheKey);
+        if (cached == null) return null;
+        return (cached as List<dynamic>).cast<Map<String, dynamic>>();
+      },
     );
-
-    return controller.stream;
   }
 
   static Future<Map<String, dynamic>> create({required String title, String? body}) async {
@@ -48,5 +43,17 @@ class NotificationRepository {
 
   static Future<void> markAllRead() async {
     await ApiClient.instance.post('/notifications/mark-all-read');
+  }
+
+  static Future<void> delete(String id) async {
+    await ApiClient.instance.delete('/notifications/$id');
+  }
+
+  static Future<void> bulkDelete(List<String> ids) async {
+    await ApiClient.instance.post('/notifications/bulk-delete', body: {'ids': ids});
+  }
+
+  static Future<void> clearAll() async {
+    await ApiClient.instance.delete('/notifications');
   }
 }
