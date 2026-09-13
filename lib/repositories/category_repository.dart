@@ -2,11 +2,15 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import 'dart:async';
+
 import '../models/model.dart';
 import '../services/api_client.dart';
+import '../services/local_cache.dart';
 
 /// Centralizes category access against the Laravel API (`/api/categories`).
 class CategoryRepository {
+  static const _cacheKey = 'categories';
   static List<CategoryModel> generateCategories() {
     final uuid = Uuid();
     return [
@@ -62,13 +66,22 @@ class CategoryRepository {
   /// orders results `is_default desc, position asc`, so no client-side
   /// re-sort is needed.
   static Future<List<CategoryModel>> loadOrInitializeCategories() async {
-    var categories = await _fetchCategories();
-
-    if (categories.isEmpty) {
-      await ApiClient.instance.post('/categories/batch', body: {
-        'categories': generateCategories().map((c) => c.toJson()).toList(),
-      });
+    List<CategoryModel> categories;
+    try {
       categories = await _fetchCategories();
+
+      if (categories.isEmpty) {
+        await ApiClient.instance.post('/categories/batch', body: {
+          'categories': generateCategories().map((c) => c.toJson()).toList(),
+        });
+        categories = await _fetchCategories();
+      }
+    } catch (_) {
+      // Offline or the server didn't respond in time - fall back to the last
+      // successful response rather than leaving the caller with nothing.
+      final cached = await _cachedCategories();
+      if (cached == null) rethrow;
+      categories = cached;
     }
 
     return [...categories, getAddCategoryBox()];
@@ -76,7 +89,15 @@ class CategoryRepository {
 
   static Future<List<CategoryModel>> _fetchCategories() async {
     final data = await ApiClient.instance.get('/categories') as List<dynamic>;
-    return data.map((json) => CategoryModel.fromJson(json as Map<String, dynamic>)).toList();
+    final items = data.cast<Map<String, dynamic>>();
+    unawaited(LocalCache.putJson(_cacheKey, items));
+    return items.map(CategoryModel.fromJson).toList();
+  }
+
+  static Future<List<CategoryModel>?> _cachedCategories() async {
+    final cached = await LocalCache.getJson(_cacheKey);
+    if (cached == null) return null;
+    return (cached as List<dynamic>).cast<Map<String, dynamic>>().map(CategoryModel.fromJson).toList();
   }
 
   static Future<CategoryModel> createCategory({

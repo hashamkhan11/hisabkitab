@@ -1,32 +1,28 @@
 import 'dart:async';
 
 import '../services/api_client.dart';
+import '../services/local_cache.dart';
+import '../services/polling.dart';
 
 /// Home screen's total Send/Receive balance across every transaction the
 /// user owns, via `/api/summary/balance` (replaces the old
 /// `collectionGroup('transactions')` listener).
 class SummaryRepository {
   static const _pollInterval = Duration(seconds: 15);
+  static const _cacheKey = 'summary_balance';
 
   static Stream<Map<String, dynamic>> balanceStream() {
-    late final StreamController<Map<String, dynamic>> controller;
-    Timer? timer;
-
-    Future<void> tick() async {
-      try {
+    return pollingStream(
+      interval: _pollInterval,
+      fetch: () async {
         final data = await ApiClient.instance.get('/summary/balance') as Map<String, dynamic>;
-        controller.add(data);
-      } catch (_) {}
-    }
-
-    controller = StreamController<Map<String, dynamic>>(
-      onListen: () {
-        tick();
-        timer = Timer.periodic(_pollInterval, (_) => tick());
+        unawaited(LocalCache.putJson(_cacheKey, data));
+        return data;
       },
-      onCancel: () => timer?.cancel(),
+      initialValue: () async {
+        final cached = await LocalCache.getJson(_cacheKey);
+        return cached == null ? null : cached as Map<String, dynamic>;
+      },
     );
-
-    return controller.stream;
   }
 }

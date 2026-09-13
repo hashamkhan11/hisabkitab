@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -15,6 +17,21 @@ class ApiException implements Exception {
   @override
   String toString() => message;
 }
+
+/// Thrown when a request can't reach the server at all - timed out, or the
+/// device has no usable connection. Distinct from [ApiException] (a real
+/// HTTP error response) so callers/UI can tell "server said no" apart from
+/// "never got an answer" and show a retry-able "you're offline" message.
+class ApiConnectionException implements Exception {
+  final String message;
+
+  ApiConnectionException([this.message = 'No internet connection. Please try again.']);
+
+  @override
+  String toString() => message;
+}
+
+const _requestTimeout = Duration(seconds: 12);
 
 /// Thin wrapper around `http` that points every call at the Laravel backend,
 /// attaches the current Firebase ID token, and decodes JSON responses.
@@ -37,6 +54,15 @@ class ApiClient {
     defaultValue: 'http://10.0.2.2:8000/api',
   );
 
+  /// The public host that ledger-invite links and shared deep links point
+  /// at - must match the backend's `APP_URL` (and the Android manifest's
+  /// registered `https` intent-filter host) so an invite actually opens the
+  /// app instead of a dead link. Override with `--dart-define=SHARE_LINK_BASE_URL=...`.
+  static const String shareLinkBaseUrl = String.fromEnvironment(
+    'SHARE_LINK_BASE_URL',
+    defaultValue: 'https://hisabshare.projects.ranksol.net',
+  );
+
   Future<Map<String, String>> _headers() async {
     final token = await FirebaseAuth.instance.currentUser?.getIdToken();
     return {
@@ -54,31 +80,55 @@ class ApiClient {
   }
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
-    final response = await http.get(_uri(path, query), headers: await _headers());
+    final response = await _guard(
+      () async => http.get(_uri(path, query), headers: await _headers()),
+    );
     return _decode(response);
   }
 
   Future<dynamic> post(String path, {Object? body}) async {
-    final response = await http.post(
-      _uri(path),
-      headers: await _headers(),
-      body: body == null ? null : jsonEncode(body),
+    final response = await _guard(
+      () async => http.post(
+        _uri(path),
+        headers: await _headers(),
+        body: body == null ? null : jsonEncode(body),
+      ),
     );
     return _decode(response);
   }
 
   Future<dynamic> patch(String path, {Object? body}) async {
-    final response = await http.patch(
-      _uri(path),
-      headers: await _headers(),
-      body: body == null ? null : jsonEncode(body),
+    final response = await _guard(
+      () async => http.patch(
+        _uri(path),
+        headers: await _headers(),
+        body: body == null ? null : jsonEncode(body),
+      ),
     );
     return _decode(response);
   }
 
   Future<dynamic> delete(String path) async {
-    final response = await http.delete(_uri(path), headers: await _headers());
+    final response = await _guard(
+      () async => http.delete(_uri(path), headers: await _headers()),
+    );
     return _decode(response);
+  }
+
+  /// Applies a fixed timeout to every request and translates connection-level
+  /// failures (timeout, DNS failure, socket error) into [ApiConnectionException]
+  /// so callers can distinguish "couldn't reach the server" from a real HTTP
+  /// error response, instead of an unhandled low-level exception.
+  Future<http.Response> _guard(Future<http.Response> Function() request) async {
+    try {
+      return await request().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw ApiConnectionException();
+    } on SocketException {
+      throw ApiConnectionException();
+    } on HttpException {
+      throw ApiConnectionException();
+    }
   }
 
   dynamic _decode(http.Response response) {
