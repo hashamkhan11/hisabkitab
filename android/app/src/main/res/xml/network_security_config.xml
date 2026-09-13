@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Allows plaintext HTTP only to the local `php artisan serve` dev backend,
+  used while API_BASE_URL is overridden for on-device testing. Does not
+  relax cleartext policy for any other host.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>
