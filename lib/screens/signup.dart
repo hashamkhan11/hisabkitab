@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hisabshare/repositories/user_repository.dart';
 import 'package:hisabshare/screens/privacy_policy_page.dart';
 import 'package:hisabshare/screens/terms_page.dart';
+import 'package:hisabshare/theme/app_theme.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -24,9 +25,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscureConfirmPassword = true;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  //final ApiService _apiService = ApiService();
 
-  void _signup() async {
+  Future<void> _signup() async {
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please agree to the terms and conditions')),
@@ -41,15 +41,12 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-if (_emailController.text.trim().isEmpty) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Please enter your email address.')),
-  );
-  setState(() {
-    _isLoading = false;
-  });
-  return;
-}
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email address.')),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -60,6 +57,7 @@ if (_emailController.text.trim().isEmpty) {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      if (!mounted) return;
 
       //  Save user data including mobile number to the API (email is set from
       //  the verified Firebase ID token via the backend's lazy-sync, not here)
@@ -67,261 +65,170 @@ if (_emailController.text.trim().isEmpty) {
         username: _usernameController.text.trim(),
         mobileNo: _mobileNoController.text.trim(),
       );
+      if (!mounted) return;
 
-await userCredential.user!.sendEmailVerification();
+      await userCredential.user!.sendEmailVerification();
+      if (!mounted) return;
 
-ScaffoldMessenger.of(context).showSnackBar(
-  const SnackBar(content: Text('Verification email sent. Please verify your email before logging in.')),
-);
-
-Navigator.pop(context);
-
-       /* ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signup Successful!')),
-      ); */
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verification email sent. Please verify your email before logging in.')),
+      );
 
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Signup Failed')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  /*  try {
-      final response = await _apiService.signup(
-        username: _usernameController.text.trim(),
-        mobileNo: _mobileNoController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      if (response['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response['message'] ?? 'Signup Successful!')),
-        );
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response['message'] ?? 'Signup Failed')),
-        );
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
-*/
+
   void _navigateToLogin() {
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'Sign Up',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(color: c.accentSoft, borderRadius: BorderRadius.circular(16)),
+                    child: Icon(Icons.person_add_alt_1_rounded, color: c.accentStrong, size: 28),
                   ),
-                ),
-                const SizedBox(height: 40),
+                  const SizedBox(height: 20),
+                  Text('Create account', style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 4),
+                  Text('Start tracking shared expenses in minutes', style: TextStyle(color: c.textMuted)),
+                  const SizedBox(height: 28),
 
-                // Username Field
-                TextField(
-                  controller: _usernameController,
-                  decoration: InputDecoration(
-                    hintText: 'Username',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  TextField(
+                    controller: _usernameController,
+                    decoration: const InputDecoration(hintText: 'Username', prefixIcon: Icon(Icons.person_outline_rounded)),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                // Mobile No Field 
-                TextField(
-                  controller: _mobileNoController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    hintText: 'Mobile Number',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  TextField(
+                    controller: _mobileNoController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(hintText: 'Mobile number', prefixIcon: Icon(Icons.phone_outlined)),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                // Email Field
-                TextField(
-                  controller: _emailController,
-                  decoration: InputDecoration(
-                    hintText: 'Email',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  TextField(
+                    controller: _emailController,
+                    decoration: const InputDecoration(hintText: 'Email', prefixIcon: Icon(Icons.mail_outline_rounded)),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                // Password Field
-                TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: 'Password',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      hintText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                // Confirm Password Field
-                TextField(
-                  controller: _confirmPasswordController,
-                  obscureText: _obscureConfirmPassword,
-                  decoration: InputDecoration(
-                    hintText: 'Confirm password',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                  TextField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
+                    decoration: InputDecoration(
+                      hintText: 'Confirm password',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureConfirmPassword = !_obscureConfirmPassword;
-                        });
-                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                // Terms and Conditions
-                Row(
-                  children: [
-                    Checkbox(
-                      activeColor:Color(0xFF89BE4F),
-                      checkColor: Colors.white,
-                      value: _agreeToTerms,
-                      onChanged: (value) {
-                        setState(() {
-                          _agreeToTerms = value ?? false;
-                        });
-                      },
-                    ),
-                    Expanded(
-                      child: Wrap(
-                        children: [
-                          const Text('By signing up, I agree with the '),
-                          GestureDetector(
-                            onTap: () {
-                           Navigator.push(
-                           context,
-                           MaterialPageRoute(builder: (context) => const TermsPage()),
-                              );
-                            },
-                            child: const Text(
-                              'Terms of Use',
-                              style: TextStyle(color: Colors.lightGreen),
-                            ),
-                          ),
-                          const Text(' and '),
-                          GestureDetector(
-                            onTap: () {
-                            Navigator.push(
-                            context,
-                             MaterialPageRoute(builder: (context) => const PrivacyPolicyPage()),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Checkbox(
+                        value: _agreeToTerms,
+                        onChanged: (value) => setState(() => _agreeToTerms = value ?? false),
+                      ),
+                      Expanded(
+                        child: Wrap(
+                          children: [
+                            Text('By signing up, I agree with the ', style: TextStyle(color: c.textMuted)),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const TermsPage()),
                                 );
-                            },
-                            child: const Text(
-                              'Privacy Policy',
-                              style: TextStyle(color: Colors.lightGreen),
+                              },
+                              child: Text('Terms of Use', style: TextStyle(color: c.accentStrong, fontWeight: FontWeight.w600)),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Sign Up Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _signup,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.lightGreen,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
-                          )
-                        : const Text(
-                            'Sign up',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            Text(' and ', style: TextStyle(color: c.textMuted)),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const PrivacyPolicyPage()),
+                                );
+                              },
+                              child: Text('Privacy Policy', style: TextStyle(color: c.accentStrong, fontWeight: FontWeight.w600)),
                             ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Already have account
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Already have an account? '),
-                    GestureDetector(
-                      onTap: _navigateToLogin,
-                      child: const Text(
-                        'Log in',
-                        style: TextStyle(
-                          color: Colors.lightGreen,
-                          fontWeight: FontWeight.bold,
+                          ],
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _signup,
+                      child: _isLoading
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2.4, color: c.onAccent),
+                            )
+                          : const Text('Sign up'),
                     ),
-                  ],
-                )
-              ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Already have an account? ', style: TextStyle(color: c.textMuted)),
+                      GestureDetector(
+                        onTap: _navigateToLogin,
+                        child: Text('Log in', style: TextStyle(color: c.accentStrong, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  )
+                ],
+              ),
             ),
           ),
         ),

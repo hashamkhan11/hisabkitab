@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class ForgotPassword extends StatefulWidget {
   const ForgotPassword({super.key});
 
@@ -10,17 +12,21 @@ class ForgotPassword extends StatefulWidget {
 
 class _ForgotPasswordState extends State<ForgotPassword> {
   TextEditingController emailController = TextEditingController();
+  bool _isSending = false;
 
   void forgotPassword(String email) async {
     if (email.isEmpty) {
       showAlert("Enter an email to reset password");
-    } else {
-      try {
-        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-        showAlert("Password reset email has been sent");
-      } catch (e) {
-        showAlert("Error: ${e.toString()}");
-      }
+      return;
+    }
+    setState(() => _isSending = true);
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) showAlert("Password reset email has been sent");
+    } catch (e) {
+      if (mounted) showAlert("Error: ${e.toString()}");
+    } finally {
+      if (mounted) setState(() => _isSending = false);
     }
   }
 
@@ -28,12 +34,12 @@ class _ForgotPasswordState extends State<ForgotPassword> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Notice"),
+        title: const Text("Notice"),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("OK"),
+            child: const Text("OK"),
           )
         ],
       ),
@@ -42,39 +48,57 @@ class _ForgotPasswordState extends State<ForgotPassword> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
     return Scaffold(
       appBar: AppBar(
-        title: Text("Forgot Password"),
+        title: const Text("Forgot password"),
         centerTitle: true,
-        backgroundColor: Colors.lightGreen, 
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SizedBox(height: 24),
+            Center(
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(color: c.accentSoft, shape: BoxShape.circle),
+                child: Icon(Icons.lock_reset_rounded, color: c.accentStrong, size: 34),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Reset your password',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Enter the email linked to your account and we'll send you a reset link.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: c.textMuted),
+            ),
+            const SizedBox(height: 28),
             TextField(
               controller: emailController,
-              decoration: InputDecoration(
-                labelText: "Email",
-                prefixIcon: Icon(Icons.mail),
-                border: OutlineInputBorder(),
+              decoration: const InputDecoration(
+                hintText: "Email",
+                prefixIcon: Icon(Icons.mail_outline_rounded),
               ),
               keyboardType: TextInputType.emailAddress,
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {
-                forgotPassword(emailController.text.trim());
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.lightGreen, 
-                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-              ),
-              child: Text(
-                "Reset Password",
-                style: TextStyle(fontSize: 16, color: Colors.white),
-              ),
+              onPressed: _isSending ? null : () => forgotPassword(emailController.text.trim()),
+              child: _isSending
+                  ? SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.4, color: c.onAccent),
+                    )
+                  : const Text("Send reset link"),
             ),
           ],
         ),

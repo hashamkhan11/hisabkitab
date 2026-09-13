@@ -3,18 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/contacts_provider.dart';
+import '../theme/app_theme.dart';
 
 class ListPage extends StatelessWidget {
   final String categoryName;
-  final List<Map<String, dynamic>> contacts;
+  final String categoryId;
 
   const ListPage({
-    Key? key,
     required this.categoryName,
-    required this.contacts,
-  }) : super(key: key);
+    required this.categoryId,
+    super.key,
+  });
 
-  Future<Uint8List> _generatePdf(PdfPageFormat format) async {
+  Future<Uint8List> _generatePdf(PdfPageFormat format, List<Map<String, dynamic>> contacts) async {
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -46,45 +50,49 @@ class ListPage extends StatelessWidget {
   }
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
+    final contacts = context.watch<ContactsProvider>().contactsFor(categoryId);
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF89BE4F),
         title: Text(categoryName),
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
             tooltip: "Download PDF",
             onPressed: () async {
-              final pdfData = await _generatePdf(PdfPageFormat.a4);
+              final pdfData = await _generatePdf(PdfPageFormat.a4, contacts);
               await Printing.sharePdf(bytes: pdfData, filename: '$categoryName-Contacts.pdf');
             },
           ),
         ],
       ),
       body: contacts.isEmpty
-          ? const Center(child: Text('No contacts added.'))
+          ? Center(child: Text('No contacts added.', style: TextStyle(color: c.textMuted)))
           : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               itemCount: contacts.length,
               itemBuilder: (context, index) {
                 final contact = contacts[index];
                 return Card(
-                  color: index % 2 == 0 ? Colors.orange.shade100 : Colors.deepOrange.shade200,
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  color: c.surface,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: c.border),
+                  ),
                   child: ListTile(
                     title: Text(
                       contact['name'] ?? '',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: c.textColor),
                     ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 4),
-                        Text('Phone: ${contact['mobileNo'] ?? ''}'),
-                        Text('Email: ${contact['email'] ?? ''}'),
+                        Text('Phone: ${contact['mobileNo'] ?? ''}', style: TextStyle(color: c.textMuted)),
+                        Text('Email: ${contact['email'] ?? ''}', style: TextStyle(color: c.textMuted)),
                         if (contact['isSharedView'] != true)
-                          Text('Address: ${contact['address'] ?? ''}'),
+                          Text('Address: ${contact['address'] ?? ''}', style: TextStyle(color: c.textMuted)),
                       ],
                     ),
                     onLongPress: () {
@@ -99,15 +107,24 @@ class ListPage extends StatelessWidget {
                               child: const Text('Cancel'),
                             ),
                             TextButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 Navigator.pop(context);
-                                contacts.removeAt(index);
-                                (context as Element).markNeedsBuild();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Contact deleted')),
-                                );
+                                try {
+                                  await context.read<ContactsProvider>().deleteContact(categoryId, contact['id'] as String);
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Contact deleted')),
+                                  );
+                                } catch (_) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Failed to delete contact. Please try again.'),
+                                    ),
+                                  );
+                                }
                               },
-                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                              child: Text('Delete', style: TextStyle(color: c.danger)),
                             ),
                           ],
                         ),

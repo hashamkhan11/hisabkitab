@@ -4,6 +4,7 @@ import 'package:hisabshare/repositories/user_repository.dart';
 import 'package:hisabshare/screens/forgot_password.dart';
 import 'package:hisabshare/screens/signup.dart';
 import 'package:hisabshare/screens/home.dart';
+import 'package:hisabshare/theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
-  void _login() async {
+  Future<void> _login() async {
     String identifier = _identifierController.text.trim();
     String password = _passwordController.text.trim();
 
@@ -58,6 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // If it's mobile number, fetch email
       if (!identifier.contains('@')) {
         String? fetchedEmail = await _getEmailFromMobile(identifier);
+        if (!mounted) return;
         if (fetchedEmail == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Incorrect email or password.')),
@@ -71,14 +73,11 @@ class _LoginScreenState extends State<LoginScreen> {
         email: emailToUse,
         password: password,
       );
-
-     /* final uid = _auth.currentUser!.uid;   //loading at login
-      final dataService = DataService();
-      final appData = await dataService.loadUserData(uid);
-      print("### Loaded data: $appData"); */
+      if (!mounted) return;
 
       if (!_auth.currentUser!.emailVerified) {
         await _auth.signOut();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please verify your email before logging in.')),
         );
@@ -94,28 +93,12 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       );
-       /* print("UID: $uid");     //for loading at login
-      print("AppData after load: $appData");
-      if (appData != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => Homepage(
-              onThemeToggle: (value) {},
-              isDarkMode: false,
-              appData: appData, // ab safe hai
-            ),
-          ),
-        );
-      } else {
-        print("No data found for this user!");
-      }*/
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Successful!')),
       );
     } on FirebaseAuthException catch (e) {
-      //  Handle ALL known FirebaseAuth errors with friendly text
+      if (!mounted) return;
       const incorrectCredCodes = [
         'wrong-password',
         'user-not-found',
@@ -138,9 +121,11 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -153,117 +138,92 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'Welcome back!',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(color: c.accentSoft, borderRadius: BorderRadius.circular(16)),
+                    child: Icon(Icons.account_balance_wallet_rounded, color: c.accentStrong, size: 28),
                   ),
-                ),
-                const SizedBox(height: 40),
+                  const SizedBox(height: 20),
+                  Text('Welcome back', style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 4),
+                  Text('Log in to keep track of your ledgers', style: TextStyle(color: c.textMuted)),
+                  const SizedBox(height: 32),
 
-                // Email or Mobile Field
-                TextField(
-                  controller: _identifierController,
-                  decoration: InputDecoration(
-                    hintText: 'Email or Mobile Number',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  TextField(
+                    controller: _identifierController,
+                    decoration: const InputDecoration(
+                      hintText: 'Email or mobile number',
+                      prefixIcon: Icon(Icons.person_outline_rounded),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                // Password Field
-                TextField(
-                  controller: _passwordController,
-                  obscureText: _obscureText,
-                  decoration: InputDecoration(
-                    hintText: 'Enter your password',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureText ? Icons.visibility_off : Icons.visibility,
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: _obscureText,
+                    decoration: InputDecoration(
+                      hintText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                        onPressed: () => setState(() => _obscureText = !_obscureText),
                       ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
                       onPressed: () {
-                        setState(() {
-                          _obscureText = !_obscureText;
-                        });
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => ForgotPassword()),
+                        );
                       },
+                      child: const Text('Forgot password?'),
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-
-                Align(
-  alignment: Alignment.centerRight,
-  child: TextButton(
-    onPressed: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => ForgotPassword()),
-      );
-    },
-    child: const Text(
-      'Forget password',
-      style: TextStyle(color: Color.fromARGB(255, 137, 190, 79)),
-    ),
-  ),
-),
-
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 137, 190, 79),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _login,
+                      child: _isLoading
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2.4, color: c.onAccent),
+                            )
+                          : const Text('Log in'),
                     ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            'Login',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Need to create an account? '),
-                    GestureDetector(
-                      onTap: _navigateToSignup,
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                         color: Color.fromARGB(255, 137, 190, 79),
-                        // color: Colors.green,
-                          fontWeight: FontWeight.bold,
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text("Don't have an account? ", style: TextStyle(color: c.textMuted)),
+                      GestureDetector(
+                        onTap: _navigateToSignup,
+                        child: Text(
+                          'Sign up',
+                          style: TextStyle(color: c.accentStrong, fontWeight: FontWeight.w700),
                         ),
                       ),
-                    ),
-                  ],
-                )
-              ],
+                    ],
+                  )
+                ],
+              ),
             ),
           ),
         ),

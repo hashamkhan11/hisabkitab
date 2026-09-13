@@ -14,8 +14,8 @@ class ChooseCategoryPage extends StatefulWidget {
     required this.contactId,
     required this.contactName,
     required this.senderName,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   State<ChooseCategoryPage> createState() => _ChooseCategoryPageState();
@@ -99,7 +99,7 @@ class _ChooseCategoryPageState extends State<ChooseCategoryPage> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedCategoryId,
+                  initialValue: selectedCategoryId,
                   items: [
                     ...categories.map((cat) => DropdownMenuItem(
                           value: cat.id,
