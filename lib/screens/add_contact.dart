@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:hisabshare/repositories/contact_repository.dart';
+import 'package:hisabshare/theme/app_theme.dart';
 
 class AddContactPage extends StatefulWidget {
   final String categoryId;
   final String categoryName;
-  
 
-  const AddContactPage({Key? key, required this.categoryId, required this.categoryName,}) : super(key: key);
+  const AddContactPage({required this.categoryId, required this.categoryName, super.key});
 
   @override
   State<AddContactPage> createState() => _AddContactPageState();
 }
+
 class _AddContactPageState extends State<AddContactPage> {
   final _formKey = GlobalKey<FormState>();
 
@@ -18,27 +19,34 @@ class _AddContactPageState extends State<AddContactPage> {
   final TextEditingController mobileNoController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
-  String? selectedCategory;
+
+  bool _isSaving = false;
 
   void _submitTask() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final newContact = await ContactRepository.addContact(
-          categoryId: widget.categoryId,
-          name: nameController.text.trim(),
-          mobileNo: mobileNoController.text.trim(),
-          email: emailController.text.trim(),
-          address: addressController.text.trim(),
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Contact added successfully!')),
-        );
-        Navigator.pop(context, newContact);
-      } catch (e) {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+    try {
+      final newContact = await ContactRepository.addContact(
+        categoryId: widget.categoryId,
+        name: nameController.text.trim(),
+        mobileNo: mobileNoController.text.trim(),
+        email: emailController.text.trim(),
+        address: addressController.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Contact added successfully!')),
+      );
+      Navigator.pop(context, newContact);
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to add contact: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -53,21 +61,21 @@ class _AddContactPageState extends State<AddContactPage> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.appColors;
     return Scaffold(
-
-      appBar: AppBar(title: const Text('New Contact'), backgroundColor: Color(0xFF89BE4F), centerTitle: true,),
-
+      appBar: AppBar(title: const Text('New Contact')),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
-              const Text('Contact Name', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
               TextFormField(
                 controller: nameController,
-                decoration: const InputDecoration(border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  hintText: 'Contact name',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                ),
                 validator: (val) {
                   if (val == null || val.isEmpty) return 'Enter contact name';
                   final nameRegex = RegExp(r'^[a-zA-Z ]+$');
@@ -75,13 +83,14 @@ class _AddContactPageState extends State<AddContactPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
-              const Text('Mobile No', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: mobileNoController,
-                decoration: const InputDecoration(border: OutlineInputBorder()),
                 keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  hintText: 'Mobile number',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
                 validator: (val) {
                   if (val == null || val.isEmpty) return 'Enter mobile number';
                   final phoneRegex = RegExp(r'^[0-9]{10,15}$');
@@ -89,13 +98,14 @@ class _AddContactPageState extends State<AddContactPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
-              const Text('Email', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: emailController,
-                decoration: const InputDecoration(border: OutlineInputBorder()),
                 keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  hintText: 'Email',
+                  prefixIcon: Icon(Icons.mail_outline_rounded),
+                ),
                 validator: (val) {
                   if (val == null || val.isEmpty) return 'Enter email';
                   final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
@@ -103,27 +113,42 @@ class _AddContactPageState extends State<AddContactPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
-              const Text('Address', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: addressController,
-                decoration: const InputDecoration(border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  hintText: 'Address',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
                 validator: (val) => val == null || val.isEmpty ? 'Enter address' : null,
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 28),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  OutlinedButton(
-                    style: ElevatedButton.styleFrom(foregroundColor: Colors.black),
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: c.textColor,
+                        side: BorderSide(color: c.border),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
                   ),
-                  ElevatedButton(
-                    onPressed: _submitTask,
-                    child: const Text('Create'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF89BE4F), foregroundColor: Colors.black),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _submitTask,
+                      child: _isSaving
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2.4, color: c.onAccent),
+                            )
+                          : const Text('Create'),
+                    ),
                   ),
                 ],
               ),

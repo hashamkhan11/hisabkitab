@@ -4,11 +4,12 @@ import 'package:hisabshare/widgets/add_category.dart';
 import 'package:hisabshare/screens/detail.dart';
 import 'package:hisabshare/models/model.dart';
 import 'package:hisabshare/repositories/category_repository.dart';
+import 'package:hisabshare/theme/app_theme.dart';
 
 class Categories extends StatelessWidget {
   final List<CategoryModel> categoryList;
   final void Function(CategoryModel) onAddCategory;
-  final void Function(CategoryModel) onDeleteCategory; //
+  final void Function(CategoryModel) onDeleteCategory;
 
   const Categories({
     required this.categoryList,
@@ -17,6 +18,17 @@ class Categories extends StatelessWidget {
     super.key,
   });
 
+  static void openCategory(BuildContext context, CategoryModel category) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DetailPage(
+          categoryId: category.id,
+          categoryName: category.title,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +38,9 @@ class Categories extends StatelessWidget {
         itemCount: categoryList.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.15,
         ),
         itemBuilder: (context, index) {
           final category = categoryList[index];
@@ -40,6 +53,7 @@ class Categories extends StatelessWidget {
   }
 
   Widget _buildAddCategory(BuildContext context) {
+    final c = context.appColors;
     return GestureDetector(
       onTap: () async {
         final newCategory = await showModalBottomSheet(
@@ -57,13 +71,24 @@ class Categories extends StatelessWidget {
       child: DottedBorder(
         borderType: BorderType.RRect,
         radius: const Radius.circular(20),
-        dashPattern: const [10, 10],
-        color: Colors.grey,
-        strokeWidth: 2,
-        child: const Center(
-          child: Text(
-            '+ Add',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        dashPattern: const [8, 8],
+        color: c.border,
+        strokeWidth: 1.6,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add_rounded, color: c.accentStrong, size: 28),
+              const SizedBox(height: 6),
+              Text(
+                'Add category',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: c.textMuted,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -71,19 +96,12 @@ class Categories extends StatelessWidget {
   }
 
   Widget _buildCategory(BuildContext context, CategoryModel category) {
+    final c = context.appColors;
+    final bg = category.bgColor ?? c.accentSoft;
+    final iconColor = category.iconColor ?? c.accentStrong;
+
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DetailPage(
-              categoryId: category.id,
-              categoryName: category.title,
-      
-            ),
-          ),
-        );
-      },
+      onTap: () => openCategory(context, category),
       onLongPress: () {
         showDialog(
           context: context,
@@ -92,49 +110,46 @@ class Categories extends StatelessWidget {
             content: Text('Delete "${category.title}"?'),
             actions: [
               TextButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                },
+                onPressed: () => Navigator.of(dialogContext).pop(),
                 child: const Text('Cancel'),
               ),
               TextButton(
                 onPressed: () async {
                   Navigator.of(dialogContext).pop();
-
                   await CategoryRepository.deleteCategory(category.id);
-
-                  onDeleteCategory(category); //  Pass category instead of index
+                  onDeleteCategory(category);
                 },
-                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                child: Text('Delete', style: TextStyle(color: c.danger)),
               ),
             ],
           ),
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: category.bgColor,
+          color: c.surface,
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: c.border),
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 10),
-            Center(
-              child: Icon(
-                category.iconData ?? Icons.category,
-                color: Colors.white,
-                size: 80,
-              ),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
+              child: Icon(category.iconData ?? Icons.category, color: iconColor, size: 24),
             ),
+            const Spacer(),
             Text(
               category.title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: c.textColor,
               ),
             ),
           ],
