@@ -1,27 +1,55 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:hisabshare/widgets/add_category.dart';
 import 'package:hisabshare/screens/contact_detail.dart';
-import 'package:hisabshare/models/model.dart';
-import 'package:hisabshare/screens/login.dart';
-import 'package:hisabshare/screens/notifications.dart';
-import 'package:hisabshare/screens/profile.dart';
-import 'package:hisabshare/screens/home.dart';
-import 'package:hisabshare/services/notification_service.dart';
 import 'package:hisabshare/services/push_notification_service.dart';
 import 'package:hisabshare/screens/welcome.dart';
+import 'package:hisabshare/providers/current_user_provider.dart';
+import 'package:hisabshare/providers/contacts_provider.dart';
+import 'package:hisabshare/providers/theme_provider.dart';
+import 'package:hisabshare/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); 
- await PushNotificationService.initialize(); 
-  //await NotificationService().initialize();
-  runApp(MyApp());
+  await Firebase.initializeApp();
+
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+
+  runZonedGuarded(
+    () => runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => CurrentUserProvider()),
+          ChangeNotifierProvider(create: (_) => ContactsProvider()),
+          ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ],
+        child: MyApp(),
+      ),
+    ),
+    (error, stack) => FirebaseCrashlytics.instance.recordError(error, stack, fatal: true),
+  );
+
+  // Deliberately not awaited and started after runApp(): this involves a
+  // native permission dialog plus a network round-trip to fetch an FCM
+  // token, neither of which should delay the first frame - especially on a
+  // slow connection where getToken() can take a long time to resolve.
+  unawaited(PushNotificationService.initialize());
 }
 
 class MyApp extends StatelessWidget {
+  MyApp({super.key});
+
   final GoRouter _router = GoRouter(
     debugLogDiagnostics: true,
     initialLocation: '/',
@@ -57,17 +85,21 @@ GoRoute(
   );
   @override
   Widget build(BuildContext context) {
-   /* SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
-    );*/
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      //statusBarColor: Colors.grey.shade100,
-      statusBarIconBrightness: Brightness.dark
-  ));
-    return MaterialApp.router(
-      debugShowCheckedModeBanner: false,
-      routerConfig: _router,
-      title: 'HisabShare App',
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+          statusBarIconBrightness:
+              themeProvider.isDarkMode ? Brightness.light : Brightness.dark,
+        ));
+        return MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          routerConfig: _router,
+          title: 'HisabShare App',
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: themeProvider.mode,
+        );
+      },
     );
   }
 }
