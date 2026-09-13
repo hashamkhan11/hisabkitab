@@ -74,4 +74,10 @@ class ContactRepository {
     final data = await ApiClient.instance.get('/contacts/$contactId/share-permission') as Map<String, dynamic>;
     return data['allow_receiver_to_add_transactions'] == true;
   }
+
+  /// Emails [contactId]'s owner-side deep link to [email], inviting them to
+  /// view/accept the shared ledger (independent of the OS share-sheet flow).
+  static Future<void> sendInviteEmail(String contactId, String email) async {
+    await ApiClient.instance.post('/contacts/$contactId/invite-email', body: {'email': email});
+  }
 }

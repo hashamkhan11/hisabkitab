@@ -1,23 +1,20 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:permission_handler/permission_handler.dart';
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
-class StatementExportService {
-  static Future<void> generateAndSavePdf(
-      BuildContext context, List<Map<String, dynamic>> transactions, contactName) async {
-    if (transactions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠ No transactions found to export.")),
-      );
-      return;
-    }
+import '../repositories/statement_email_repository.dart';
 
+class StatementExportService {
+  static Future<Uint8List> _buildPdfBytes(
+      List<Map<String, dynamic>> transactions, String contactName) {
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -39,29 +36,41 @@ class StatementExportService {
         ),
       ),
     );
-    // Request permission
-    final status = await Permission.storage.request();
-    if (!status.isGranted) {
+
+    return pdf.save();
+  }
+
+  static Future<void> generateAndSavePdf(
+      BuildContext context, List<Map<String, dynamic>> transactions, contactName) async {
+    if (transactions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(" Storage permission denied.")),
+        const SnackBar(content: Text("⚠ No transactions found to export.")),
       );
       return;
     }
-    // Save to Downloads
-    final downloadsDir = Directory('/storage/emulated/0/Download');
+
+    final bytes = await _buildPdfBytes(transactions, contactName);
     final filename = 'transactions_${DateTime.now().millisecondsSinceEpoch}.pdf';
-    final file = File('${downloadsDir.path}/$filename');
+    await Printing.sharePdf(bytes: bytes, filename: filename);
+  }
 
-    await file.writeAsBytes(await pdf.save());
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(" PDF saved to Downloads:\n$filename")),
+  /// Emails the same PDF statement [generateAndSavePdf] shares via the OS
+  /// share sheet, instead sending it server-side through Resend.
+  static Future<void> emailStatement(
+    List<Map<String, dynamic>> transactions,
+    String contactName,
+    String recipientEmail,
+  ) async {
+    final bytes = await _buildPdfBytes(transactions, contactName);
+    final filename = 'transactions_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    await StatementEmailRepository.sendStatement(
+      recipientEmail: recipientEmail,
+      contactName: contactName,
+      filename: filename,
+      contentBase64: base64Encode(bytes),
     );
   }
 
-  // Always exports an empty CSV today — the transactions list it's called
-  // with is only ever populated by a method that's never invoked. Moved
-  // as-is, still broken (Phase 2 decision — not fixed here).
   static Future<void> shareCsv(
       BuildContext context, List<Map<String, dynamic>> transactions, String contactName) async {
     if (transactions.isEmpty) {
@@ -83,6 +92,8 @@ class StatementExportService {
     final path = '${dir.path}/${contactName}_transactions.csv';
     final file = File(path);
     await file.writeAsString(csv);
-    await Share.shareXFiles([XFile(file.path)], text: 'Transaction CSV for $contactName');
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(file.path)], text: 'Transaction CSV for $contactName'),
+    );
   }
 }

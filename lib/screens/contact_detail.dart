@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hisabshare/repositories/contact_repository.dart';
 import 'package:hisabshare/screens/select_category.dart';
+import 'package:hisabshare/services/api_client.dart';
 import 'package:hisabshare/services/statement_export_service.dart';
 import 'package:hisabshare/services/transaction_service.dart';
+import 'package:hisabshare/theme/app_theme.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
@@ -36,7 +38,6 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
   final ScrollController _scrollController = ScrollController();
 
   List<Map<String, dynamic>> _latestTxns = [];
-  Offset fabPosition = const Offset(300, 700);
 
   TextEditingController searchController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
@@ -134,7 +135,6 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("Ledger saved successfully, login to your app to see the details."),
-              backgroundColor: Colors.green,
               duration: Duration(seconds: 4),
             ),
           );
@@ -205,20 +205,85 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
         credit: (transaction['credit'] as num).toDouble(),
       );
       _startStream();
-    } catch (_) {
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add transaction: $e')),
+        );
+      }
     }
   }
 
   Future<void> _shareCsv() async {
-    // Preserves a pre-existing, already-flagged bug (Phase 2 decision, not
-    // fixed here): CSV export has always produced an empty file, since the
-    // transactions list it was called with was only ever populated by a
-    // method nothing invoked. That dead field is gone now, so this passes an
-    // explicit empty list to keep the exact same (broken) behavior.
-    await StatementExportService.shareCsv(context, const [], widget.contactName);
+    await StatementExportService.shareCsv(context, _latestTxns, widget.contactName);
+  }
+
+  Future<String?> _promptEmail(String title, String confirmLabel) {
+    final emailController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: emailController,
+          keyboardType: TextInputType.emailAddress,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Recipient email'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, emailController.text.trim()),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _emailInvite() async {
+    final email = await _promptEmail('Email ledger invite', 'Send');
+    if (email == null || email.isEmpty || !mounted) return;
+    try {
+      await ContactRepository.sendInviteEmail(_contactId, email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Invite sent to $email')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send invite: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _emailStatement() async {
+    final email = await _promptEmail('Email statement', 'Send');
+    if (email == null || email.isEmpty || !mounted) return;
+    try {
+      await StatementExportService.emailStatement(_latestTxns, widget.contactName, email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Statement sent to $email')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send statement: $e')),
+        );
+      }
+    }
   }
 
   void _showAddTransactionDialog() {
+    final c = context.appColors;
     DateTime selectedTxDate = DateTime.now();
     String selectedType = 'Send';
     final creditController = TextEditingController();
@@ -234,6 +299,7 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
+                    contentPadding: EdgeInsets.zero,
                     title: Text(
                         "Date: ${selectedTxDate.day}/${selectedTxDate.month}/${selectedTxDate.year}"),
                     trailing: const Icon(Icons.calendar_today),
@@ -257,17 +323,15 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
                       ChoiceChip(
                         label: const Text("Send"),
                         selected: selectedType == "Send",
-                        onSelected: (_) =>
-                            setStateDialog(() => selectedType = "Send"),
-                        selectedColor: Colors.red.shade100,
+                        onSelected: (_) => setStateDialog(() => selectedType = "Send"),
+                        selectedColor: c.dangerSoft,
                       ),
                       const SizedBox(width: 10),
                       ChoiceChip(
                         label: const Text("Receive"),
                         selected: selectedType == "Receive",
-                        onSelected: (_) =>
-                            setStateDialog(() => selectedType = "Receive"),
-                        selectedColor: Colors.green.shade100,
+                        onSelected: (_) => setStateDialog(() => selectedType = "Receive"),
+                        selectedColor: c.accentSoft,
                       ),
                     ],
                   ),
@@ -280,9 +344,6 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
               ),
               actions: [
                 TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.black,
-                  ),
                   onPressed: () => Navigator.pop(context),
                   child: const Text("Cancel"),
                 ),
@@ -292,17 +353,11 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
                     _addTransaction({
                       'date': selectedTxDate,
                       'type': selectedType,
-                      'credit':
-                          double.tryParse(creditController.text) ?? 0.0,
+                      'credit': double.tryParse(creditController.text) ?? 0.0,
                     });
                     _noteController.clear();
                     setState(() {});
                   },
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.black, //
-                    backgroundColor: Color(0xFF89BE4F), //
-                    elevation: 0, // optional: flat style
-                  ),
                   child: const Text("Save"),
                 ),
               ],
@@ -313,356 +368,428 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-  return Screenshot(
-    controller: _screenshotController,
-    child: Scaffold(
-      appBar: AppBar(
-        title: Text(widget.contactName),
-        backgroundColor: Color(0xFF89BE4F),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-         onPressed: () {
-  StatementExportService.generateAndSavePdf(context, _latestTxns, widget.contactName);
-}
+  void _showNoteDialog(Map<String, dynamic> tx) {
+    final transactionId = tx['id'];
+    String existingNote = (tx['note'] as String?) ?? '';
+    _noteController.text = existingNote;
+    String noteText = existingNote;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Note"),
+          content: TextField(
+            controller: _noteController,
+            maxLines: 5,
+            decoration: const InputDecoration(hintText: "Write your note here..."),
+            onChanged: (txt) => noteText = txt.trim(),
           ),
-       if (!widget.isSharedView) ...[
-          IconButton(
-      icon: const Icon(Icons.share),
-      onPressed: () async {
-        try {
-          final image = await _screenshotController.capture();
-          if (image == null) {
-            return;
-          }
-          final directory = await getApplicationDocumentsDirectory();
-          final path = '${directory.path}/screenshot.png';
-          final imageFile = await File(path).create();
-          await imageFile.writeAsBytes(image);
-
-          final xFile = XFile(path);
-          final senderId = FirebaseAuth.instance.currentUser?.uid ?? '';
-          final encodedName = Uri.encodeComponent(widget.contactName);
-          final encodedCategoryId = Uri.encodeComponent(widget.categoryId);
-
-          final shareableLink =
-              'https://hisabshare.com/contact/${widget.contactId}/$encodedName?senderId=$senderId&categoryId=$encodedCategoryId&isShared=true';
-
-          await Share.shareXFiles(
-            [xFile],
-            text:
-                'Check out this contact\'s transactions: $shareableLink\n\nDownload our app: https://play.google.com/store/apps/details?id=com.ranksol.hisabshare',
-          );
-        } catch (_) {
-        }
-      },
-    ),
-       ],
-        ],
-      ),
-   body: Column(
-  children: [
-    // 1️ Total Balance under AppBar
-    StreamBuilder<List<Map<String, dynamic>>>(
-      stream: transactionStream,
-      builder: (context, snapshot) {
-        double balance = 0.0;
-        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-          for (var tx in snapshot.data!) {
-            final amount = (tx['credit'] as num).toDouble();
-            balance += tx['type'] == 'Receive' ? amount : -amount;
-          }
-        }
-        return Container(
-          width: double.infinity,
-          color: Colors.green.shade100,
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              const Text(
-                "Total Balance: ",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Text(
-               "${balance < 0 ? '-' : '+'}Rs${balance.abs().toStringAsFixed(2)}",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: balance < 0 ? Colors.red : Colors.green,
-                ),
-              ),
-            ],
-          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (noteText.isNotEmpty && transactionId != null) {
+                  try {
+                    await TransactionService.updateNote(
+                      transactionId: transactionId as String,
+                      note: noteText,
+                    );
+                    _startStream();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('Failed to save note: $e')),
+                      );
+                    }
+                  }
+                }
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text("Save"),
+            )
+          ],
         );
       },
-    ),
-    // 2️ Filters
-    Padding(
-  padding: const EdgeInsets.all(16.0),
-  child: Row(
-    children: [
-      //  Pick Date Button
-      Expanded(
-        flex: 3,
-        child: ElevatedButton.icon(
-          onPressed: _pickDate,
-          icon: const Icon(Icons.calendar_today, size: 16),
-          label: Text(
-            selectedDate != null
-                ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
-                : "Date",
-            style: const TextStyle(fontSize: 14),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey.shade300,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
-            ),
-          ),
-        ),
-      ),
+    );
+  }
 
-      const SizedBox(width: 8),
-      //  Search Field
-      Expanded(
-        flex: 4,
-        child: TextField(
-          controller: searchController,
-          decoration: InputDecoration(
-            hintText: "Search by type",
-            prefixIcon: const Icon(Icons.search),
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
-            ),
-          ),
+  Future<void> _shareScreenshot() async {
+    try {
+      final image = await _screenshotController.capture();
+      if (image == null) return;
+      final directory = await getApplicationDocumentsDirectory();
+      final path = '${directory.path}/screenshot.png';
+      final imageFile = await File(path).create();
+      await imageFile.writeAsBytes(image);
+
+      final xFile = XFile(path);
+      final senderId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final encodedName = Uri.encodeComponent(widget.contactName);
+      final encodedCategoryId = Uri.encodeComponent(widget.categoryId);
+
+      final shareableLink =
+          '${ApiClient.shareLinkBaseUrl}/contact/${widget.contactId}/$encodedName?senderId=$senderId&categoryId=$encodedCategoryId&isShared=true';
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [xFile],
+          text:
+              'Check out this contact\'s transactions: $shareableLink\n\nDownload our app: https://play.google.com/store/apps/details?id=com.ranksol.hisabshare',
         ),
-      ),
-    ],
-  ),
-),
-    // 3️ Table Header
-    Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      color: Colors.grey.shade300,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: const [
-          Expanded(flex: 2, child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(flex: 2, child: Text("Type", style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(
-            flex: 5,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(child: Text("Send", style: TextStyle(fontWeight: FontWeight.bold))),
-                Expanded(child: Text("Receive", style: TextStyle(fontWeight: FontWeight.bold))),
+      );
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return Screenshot(
+      controller: _screenshotController,
+      child: Scaffold(
+        appBar: AppBar(
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Export PDF',
+              onPressed: () => StatementExportService.generateAndSavePdf(context, _latestTxns, widget.contactName),
+            ),
+            IconButton(
+              icon: const Icon(Icons.table_chart_outlined),
+              tooltip: 'Export CSV',
+              onPressed: _shareCsv,
+            ),
+            if (!widget.isSharedView)
+              IconButton(
+                icon: const Icon(Icons.share_outlined),
+                tooltip: 'Share',
+                onPressed: _shareScreenshot,
+              ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.email_outlined),
+              tooltip: 'Email',
+              onSelected: (value) {
+                if (value == 'invite') {
+                  _emailInvite();
+                } else if (value == 'statement') {
+                  _emailStatement();
+                }
+              },
+              itemBuilder: (context) => [
+                if (!widget.isSharedView)
+                  const PopupMenuItem(value: 'invite', child: Text('Email ledger invite')),
+                const PopupMenuItem(value: 'statement', child: Text('Email statement')),
               ],
             ),
-          ),
-          Expanded(flex: 1, child: Text("Note", style: TextStyle(fontWeight: FontWeight.bold))),
-        ],
-      ),
-    ),
-    const SizedBox(height: 10),
-    // 4️ Transactions List
-
-    Expanded(
-      child: StreamBuilder<List<Map<String, dynamic>>>(
-         stream: transactionStream,
-        initialData: null,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return const Center(child: Text("Error loading transactions"));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("No transactions found."));
-          }
-          _latestTxns = snapshot.data!;
-          List<Map<String, dynamic>> txns = List.from(_latestTxns);
-
-          //  Apply filters
-          if (selectedDate != null) {
-            txns = txns.where((txn) {
-              final txnDate = txn['date'] as DateTime;
-              return txnDate.year == selectedDate!.year &&
-                     txnDate.month == selectedDate!.month &&
-                     txnDate.day == selectedDate!.day;
-            }).toList();
-          }
-
-        if (searchController.text.isNotEmpty) {
-  final query = searchController.text.toLowerCase();
-  txns = txns.where((txn) {
-    final type = (txn['type'] as String).toLowerCase();
-    final typeMatch = type.contains(query);
-    final creditMatch = txn['credit'].toString().toLowerCase().contains(query);
-
-    return typeMatch || creditMatch;
-  }).toList();
-}
-        return RefreshIndicator(
-  onRefresh: _refreshManually,
-  child: ListView.builder(
-    controller: _scrollController,
-    itemCount: txns.length,
-            itemBuilder: (context, index) {
-              final tx = txns[index];
-              final transactionId = tx['id'];
-              final txDate = tx['date'] as DateTime;
-              final isReceive = tx['type'] == 'Receive';
-
-             return Container(
-  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-  decoration:  BoxDecoration(
-
-    color: tx['status'] == 'rejected'
-        ? Colors.red.withOpacity(0.2)
-        : Colors.transparent,
-    border: const Border(bottom: BorderSide(color: Colors.grey)),
-  ),
-  child: Row(
-    children: [
-      // Date
-      Expanded(
-        flex: 2,
-        child: Text("${txDate.day}/${txDate.month}/${txDate.year}"),
-      ),
-      // Type
-      Expanded(
-        flex: 2,
-        child: Text(isReceive ? 'Receive' : 'Send'),
-      ),
-      // Credit Column
-      Expanded(
-        flex: 5,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ],
+        ),
+        body: Column(
           children: [
-            // Send Column
-            Expanded(
-              child: Text(
-                tx['type'] == 'Send'
-                    ? "Rs.${(tx['credit'] as num).toStringAsFixed(0)}"
-                    : "-", //
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  widget.contactName,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
               ),
             ),
-            // Receive Column
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: transactionStream,
+              builder: (context, snapshot) {
+                double balance = 0.0;
+                if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                  for (var tx in snapshot.data!) {
+                    final amount = (tx['credit'] as num).toDouble();
+                    balance += tx['type'] == 'Receive' ? amount : -amount;
+                  }
+                }
+                final positive = balance >= 0;
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [c.accent, c.accentStrong],
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'TOTAL BALANCE',
+                            style: TextStyle(
+                              color: c.onAccent.withValues(alpha: .85),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Rs ${balance.abs().toStringAsFixed(0)}',
+                            style: TextStyle(color: c.onAccent, fontSize: 24, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: c.onAccent.withValues(alpha: .16),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          positive ? "They'll pay you" : "You owe them",
+                          style: TextStyle(color: c.onAccent, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _pickDate,
+                    icon: const Icon(Icons.calendar_today_rounded, size: 15),
+                    label: Text(
+                      selectedDate != null
+                          ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
+                          : "Date",
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: c.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    ),
+                  ),
+                  if (selectedDate != null)
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: () => setState(() => selectedDate = null),
+                    ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: searchController,
+                      decoration: const InputDecoration(
+                        hintText: "Search by type",
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
-              child: Text(
-                tx['type'] == 'Receive'
-                    ? " Rs.${(tx['credit'] as num).toStringAsFixed(0)}"
-                    : "-",//
-                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: transactionStream,
+                initialData: null,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return const Center(child: Text("Error loading transactions"));
+                  }
+                  if (snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Text('No transactions yet', style: TextStyle(color: c.textMuted)),
+                    );
+                  }
+                  _latestTxns = snapshot.data!;
+
+                  // Compute a running balance in chronological order so the
+                  // most recent (top-of-list) row's balance matches the header.
+                  final chronological = List<Map<String, dynamic>>.from(_latestTxns)
+                    ..sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
+                  double running = 0.0;
+                  final withBalance = <Map<String, dynamic>>[];
+                  for (final tx in chronological) {
+                    final amount = (tx['credit'] as num).toDouble();
+                    running += tx['type'] == 'Receive' ? amount : -amount;
+                    withBalance.add({...tx, '_runningBalance': running});
+                  }
+                  var txns = withBalance.reversed.toList();
+
+                  if (selectedDate != null) {
+                    txns = txns.where((txn) {
+                      final txnDate = txn['date'] as DateTime;
+                      return txnDate.year == selectedDate!.year &&
+                          txnDate.month == selectedDate!.month &&
+                          txnDate.day == selectedDate!.day;
+                    }).toList();
+                  }
+
+                  if (searchController.text.isNotEmpty) {
+                    final query = searchController.text.toLowerCase();
+                    txns = txns.where((txn) {
+                      final type = (txn['type'] as String).toLowerCase();
+                      final creditMatch = txn['credit'].toString().toLowerCase().contains(query);
+                      return type.contains(query) || creditMatch;
+                    }).toList();
+                  }
+
+                  if (txns.isEmpty) {
+                    return Center(
+                      child: Text('No matching transactions', style: TextStyle(color: c.textMuted)),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: _refreshManually,
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 96),
+                      itemCount: txns.length,
+                      itemBuilder: (context, index) {
+                        final tx = txns[index];
+                        final txDate = tx['date'] as DateTime;
+                        final showDateHeader = index == 0 ||
+                            !_sameDay(txDate, txns[index - 1]['date'] as DateTime);
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (showDateHeader) ...[
+                              if (index != 0) const SizedBox(height: 12),
+                              Text(
+                                _formatDateHeader(txDate),
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: c.textMuted,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            _TransactionRow(tx: tx, onNoteTap: () => _showNoteDialog(tx)),
+                          ],
+                        );
+                      },
+                    ),
+                  );
+                },
               ),
             ),
           ],
         ),
-      ),
-
-      Expanded(
-        flex: 1,
-        child: GestureDetector(
-          onTap: () async {
-            String existingNote = (tx['note'] as String?) ?? '';
-            _noteController.text = existingNote;
-
-            // Show Dialog
-            showDialog(
-              context: context,
-              builder: (context) {
-                String noteText = existingNote;
-
-                return AlertDialog(
-                  title: Text("Note"),
-                  content: TextField(
-                    controller: _noteController,
-                    maxLines: 5,
-                    decoration: InputDecoration(
-                      hintText: "Write your note here...",
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (txt) {
-                      noteText = txt.trim();
-                    },
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text("Cancel", style: TextStyle(color: Colors.black)),
-                    ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        if (noteText.isNotEmpty && transactionId != null) {
-                          try {
-                            await TransactionService.updateNote(
-                              transactionId: transactionId as String,
-                              note: noteText,
-                            );
-                            _startStream();
-                          } catch (_) {}
-                        }
-                        Navigator.pop(context);
-                      },
-                      child: Text("Save", style: TextStyle(color: Colors.black)),
-                    )
-                  ],
-                );
-              },
-            );
-          },
-          child: Icon(Icons.book_sharp, color: Colors.green),
-        ),
-      )
-    ],
-  ),
-);
-            },
-          ),
-        );
-        },
-      ),
-    ),
-  ],
-),
-floatingActionButton: (widget.isSharedView && !allowReceiverToAdd)
-    ? null
-    : Stack(
-        children: [
-          Positioned(
-            left: fabPosition.dx,
-            top: fabPosition.dy,
-            child: Draggable(
-              feedback: FloatingActionButton(
+        floatingActionButton: (widget.isSharedView && !allowReceiverToAdd)
+            ? null
+            : FloatingActionButton(
                 onPressed: _showAddTransactionDialog,
-                backgroundColor: Colors.green.shade200,
-                child: const Icon(Icons.add, color: Colors.black),
+                child: const Icon(Icons.add),
               ),
-              childWhenDragging: Container(), // hide original when dragging
-              onDraggableCanceled: (velocity, offset) {
-                setState(() {
-                  fabPosition = offset;
-                });
-              },
-              child: FloatingActionButton(
-                onPressed: _showAddTransactionDialog,
-                backgroundColor: Color(0xFF89BE4F),
-                child: const Icon(Icons.add, color: Colors.black),
+      ),
+    );
+  }
+
+  bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+  String _formatDateHeader(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final diff = today.difference(target).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+}
+
+class _TransactionRow extends StatelessWidget {
+  final Map<String, dynamic> tx;
+  final VoidCallback onNoteTap;
+
+  const _TransactionRow({required this.tx, required this.onNoteTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final isReceive = tx['type'] == 'Receive';
+    final isRejected = tx['status'] == 'rejected';
+    final amount = (tx['credit'] as num).toDouble();
+    final hasNote = ((tx['note'] as String?) ?? '').isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isRejected ? c.dangerSoft : c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: isReceive ? c.accentSoft : c.dangerSoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isReceive ? Icons.call_received_rounded : Icons.call_made_rounded,
+              color: isReceive ? c.accentStrong : c.danger,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(isReceive ? 'Receive' : 'Send', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    if (isRejected) ...[
+                      const SizedBox(width: 6),
+                      Text('· rejected', style: TextStyle(color: c.danger, fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${isReceive ? '+' : '-'}Rs ${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              color: isReceive ? c.accentStrong : c.danger,
+            ),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: onNoteTap,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                hasNote ? Icons.sticky_note_2_rounded : Icons.sticky_note_2_outlined,
+                size: 18,
+                color: hasNote ? c.accentStrong : c.textMuted,
               ),
             ),
           ),
         ],
       ),
-    ),
-      );
-}
-
+    );
+  }
 }

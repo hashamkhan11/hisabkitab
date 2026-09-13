@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../services/api_client.dart';
+import '../services/local_cache.dart';
+import '../services/polling.dart';
 
 /// Centralizes transaction access against the Laravel API
 /// (`/api/contacts/{contactId}/transactions`, `/api/transactions/{id}/...`).
@@ -14,28 +16,15 @@ class TransactionService {
     required String contactId,
     String? status,
   }) {
-    late final StreamController<List<Map<String, dynamic>>> controller;
-    Timer? timer;
-
-    Future<void> tick() async {
-      try {
-        controller.add(await _fetchTransactions(contactId: contactId, status: status));
-      } catch (_) {
-        // Preserves the existing resilience style used throughout the repositories:
-        // swallow and let the next poll retry rather than surfacing a stream error.
-      }
-    }
-
-    controller = StreamController<List<Map<String, dynamic>>>(
-      onListen: () {
-        tick();
-        timer = Timer.periodic(_pollInterval, (_) => tick());
-      },
-      onCancel: () => timer?.cancel(),
+    return pollingStream(
+      interval: _pollInterval,
+      fetch: () => _fetchTransactions(contactId: contactId, status: status),
+      initialValue: () => _cachedTransactions(contactId, status),
     );
-
-    return controller.stream;
   }
+
+  static String _cacheKey(String contactId, String? status) =>
+      'transactions_$contactId${status != null ? '_$status' : ''}';
 
   static Future<List<Map<String, dynamic>>> _fetchTransactions({
     required String contactId,
@@ -47,7 +36,48 @@ class TransactionService {
     ) as Map<String, dynamic>;
 
     final items = (data['data'] as List<dynamic>).cast<Map<String, dynamic>>();
+    unawaited(LocalCache.putJson(_cacheKey(contactId, status), items));
     return items.map(_parseTransaction).toList();
+  }
+
+  /// Reads the raw (pre-parse) transactions cached by the last successful
+  /// fetch, if any, and runs them through the same [_parseTransaction] step
+  /// as a live response so cached and live data end up in the exact same
+  /// shape.
+  static Future<List<Map<String, dynamic>>?> _cachedTransactions(
+    String contactId,
+    String? status,
+  ) async {
+    final cached = await LocalCache.getJson(_cacheKey(contactId, status));
+    if (cached == null) return null;
+    return (cached as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(_parseTransaction)
+        .toList();
+  }
+
+  /// One-shot (non-polling) fetch across several contacts at once, merged and
+  /// sorted newest-first - used to show "recent activity" for a whole
+  /// category, since no backend endpoint aggregates transactions across
+  /// contacts and a category only ever has a handful of them.
+  static Future<List<Map<String, dynamic>>> recentAcrossContacts(
+    List<Map<String, String>> contacts, {
+    int limit = 5,
+  }) async {
+    final results = await Future.wait(contacts.map((contact) async {
+      final txns = await _fetchTransactions(contactId: contact['id']!);
+      return txns.map((t) => {
+            ...t,
+            'contactId': contact['id'],
+            'contactName': contact['name'],
+            if (contact['categoryId'] != null) 'categoryId': contact['categoryId'],
+          });
+    }));
+
+    final merged = results.expand((x) => x).toList()
+      ..sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+
+    return merged.take(limit).toList();
   }
 
   static Map<String, dynamic> _parseTransaction(Map<String, dynamic> json) {
