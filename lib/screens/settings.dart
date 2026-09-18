@@ -301,8 +301,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _isUploading = true);
     try {
       final file = File(pickedFile.path);
-      final ref = FirebaseStorage.instance.ref().child('profile_images').child(uid);
-      final snapshot = await ref.putFile(file);
+      final extension = pickedFile.path.split('.').last.toLowerCase();
+      final ref = FirebaseStorage.instance.ref().child('profile_images').child('$uid.$extension');
+      final snapshot = await ref.putFile(
+        file,
+        SettableMetadata(contentType: 'image/$extension'),
+      );
 
       if (snapshot.state != TaskState.success) {
         throw Exception('Upload failed. Try again.');
@@ -315,6 +319,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _imageUrl = url;
         _isUploading = false;
       });
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        setState(() => _isUploading = false);
+        final message = e.code == 'unauthorized' || e.code == 'unauthenticated'
+            ? "You don't have permission to upload a photo. Please try logging in again."
+            : 'Could not upload photo (${e.code}). Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isUploading = false);
