@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/contacts_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/header_icon_button.dart';
 
 class ListPage extends StatelessWidget {
   final String categoryName;
@@ -55,81 +56,90 @@ class ListPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(categoryName),
+        centerTitle: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf_outlined),
+          HeaderIconButton(
+            icon: Icons.picture_as_pdf_outlined,
             tooltip: "Download PDF",
-            onPressed: () async {
+            onTap: () async {
               final pdfData = await _generatePdf(PdfPageFormat.a4, contacts);
               await Printing.sharePdf(bytes: pdfData, filename: '$categoryName-Contacts.pdf');
             },
           ),
+          const SizedBox(width: 16),
         ],
       ),
       body: contacts.isEmpty
           ? Center(child: Text('No contacts added.', style: TextStyle(color: c.textMuted)))
           : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               itemCount: contacts.length,
               itemBuilder: (context, index) {
                 final contact = contacts[index];
-                return Card(
-                  color: c.surface,
+                return Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  shape: RoundedRectangleBorder(
+                  decoration: BoxDecoration(
+                    color: c.surface,
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: c.border),
+                    border: Border.all(color: c.border),
                   ),
-                  child: ListTile(
-                    title: Text(
-                      contact['name'] ?? '',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: c.textColor),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Text('Phone: ${contact['mobileNo'] ?? ''}', style: TextStyle(color: c.textMuted)),
-                        Text('Email: ${contact['email'] ?? ''}', style: TextStyle(color: c.textMuted)),
-                        if (contact['isSharedView'] != true)
-                          Text('Address: ${contact['address'] ?? ''}', style: TextStyle(color: c.textMuted)),
-                      ],
-                    ),
-                    onLongPress: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text('Delete Contact'),
-                          content: const Text('Are you sure you want to delete this contact?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel'),
+                  clipBehavior: Clip.antiAlias,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onLongPress: () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Delete Contact'),
+                            content: const Text('Are you sure you want to delete this contact?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  Navigator.pop(context);
+                                  try {
+                                    await context.read<ContactsProvider>().deleteContact(categoryId, contact['id'] as String);
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Contact deleted')),
+                                    );
+                                  } catch (_) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed to delete contact. Please try again.'),
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: Text('Delete', style: TextStyle(color: c.danger)),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              contact['name'] ?? '',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5, color: c.textColor),
                             ),
-                            TextButton(
-                              onPressed: () async {
-                                Navigator.pop(context);
-                                try {
-                                  await context.read<ContactsProvider>().deleteContact(categoryId, contact['id'] as String);
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Contact deleted')),
-                                  );
-                                } catch (_) {
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Failed to delete contact. Please try again.'),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: Text('Delete', style: TextStyle(color: c.danger)),
-                            ),
+                            const SizedBox(height: 6),
+                            Text('Phone: ${contact['mobileNo'] ?? ''}', style: TextStyle(color: c.textMuted, fontSize: 13)),
+                            Text('Email: ${contact['email'] ?? ''}', style: TextStyle(color: c.textMuted, fontSize: 13)),
+                            if (contact['isSharedView'] != true)
+                              Text('Address: ${contact['address'] ?? ''}', style: TextStyle(color: c.textMuted, fontSize: 13)),
                           ],
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 );
               },
