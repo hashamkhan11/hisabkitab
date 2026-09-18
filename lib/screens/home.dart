@@ -696,22 +696,20 @@ class _HeroBalanceCard extends StatelessWidget {
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
-              const SizedBox(height: 2),
-              Text(
-                loading
-                    ? 'Loading your balance…'
-                    : net >= 0
-                        ? "You'll receive more than you owe"
-                        : "You owe more than you'll receive",
-                style: TextStyle(color: c.onAccent.withValues(alpha: .9), fontSize: 12.5),
-              ),
+              if (loading) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Loading your balance…',
+                  style: TextStyle(color: c.onAccent.withValues(alpha: .9), fontSize: 12.5),
+                ),
+              ],
               const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: _StatChip(
                       icon: Icons.call_received_rounded,
-                      label: "You'll receive",
+                      label: 'Apko Milenge',
                       value: totalReceive,
                       onAccent: c.onAccent,
                       loading: loading,
@@ -721,7 +719,7 @@ class _HeroBalanceCard extends StatelessWidget {
                   Expanded(
                     child: _StatChip(
                       icon: Icons.call_made_rounded,
-                      label: "You'll pay",
+                      label: 'Apko Dene Hain',
                       value: totalSend,
                       onAccent: c.onAccent,
                       loading: loading,
