@@ -71,30 +71,37 @@ class MyApp extends StatelessWidget {
       GoRoute(
         path: '/',
         builder: (context, state) => HisabShareApp(),
+        // Nested under '/' rather than a top-level sibling route so that
+        // opening a ledger-invite link - whether cold-starting the app or
+        // tapping it again while the app is already running - always
+        // builds this page on top of Home in the navigation stack. As a
+        // sibling route it replaced the whole stack, which left the user
+        // with no page to go back to and no way home short of force-
+        // closing the app.
+        routes: [
+          GoRoute(
+            path: 'contact/:contactId/:contactName',
+            builder: (context, state) {
+              final categoryId = state.uri.queryParameters['categoryId'];
+              final contactId = state.pathParameters['contactId']!;
+              final contactName = Uri.decodeComponent(state.pathParameters['contactName']!);
+              final senderUserId = state.uri.queryParameters['senderId'];
+
+              return ContactDetailPage(
+                categoryId: categoryId ?? '',
+                contactId: contactId,
+                contactName: contactName,
+                isSharedView: senderUserId != null && senderUserId.isNotEmpty,
+                sharedUserId: senderUserId,
+              );
+            },
+          ),
+        ],
       ),
-
-  GoRoute(
-  path: '/contact/:contactId/:contactName',
-  builder: (context, state) {
-    final categoryId = state.uri.queryParameters['categoryId'];
-    final contactId = state.pathParameters['contactId']!;
-    final contactName = Uri.decodeComponent(state.pathParameters['contactName']!);
-    final senderUserId = state.uri.queryParameters['senderId'];
-
-    return ContactDetailPage(
-      categoryId: categoryId ?? '',
-      contactId: contactId,
-      contactName: contactName,
-      isSharedView: senderUserId != null && senderUserId.isNotEmpty,
-      sharedUserId: senderUserId,
-    );
-  },
-),
-GoRoute(
-      path: '/addCategory',
-      builder: (context, state) => AddCategorySheet(),
-    ),
-
+      GoRoute(
+        path: '/addCategory',
+        builder: (context, state) => AddCategorySheet(),
+      ),
     ],
   );
   @override
