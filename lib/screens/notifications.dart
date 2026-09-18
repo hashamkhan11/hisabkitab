@@ -4,6 +4,7 @@ import 'package:hisabshare/repositories/notification_repository.dart';
 import 'package:hisabshare/services/api_client.dart';
 import 'package:hisabshare/services/transaction_service.dart';
 import 'package:hisabshare/theme/app_theme.dart';
+import 'package:hisabshare/widgets/header_icon_button.dart';
 
 class NotificationPage extends StatefulWidget {
   final VoidCallback onBackToHome;
@@ -258,13 +259,13 @@ class _NotificationPageState extends State<NotificationPage> {
       leadingWidth: 68,
       leading: Padding(
         padding: const EdgeInsets.only(left: 16),
-        child: _HeaderIconButton(icon: Icons.arrow_back_rounded, onTap: widget.onBackToHome),
+        child: HeaderIconButton(icon: Icons.arrow_back_rounded, onTap: widget.onBackToHome),
       ),
       title: const Text('Notifications'),
       centerTitle: false,
       titleSpacing: 0,
       actions: [
-        _HeaderIconButton(
+        HeaderIconButton(
           icon: Icons.done_all_rounded,
           tooltip: 'Mark all as read',
           onTap: () async => NotificationRepository.markAllRead(),
@@ -276,7 +277,7 @@ class _NotificationPageState extends State<NotificationPage> {
             final items = (snapshot.data ?? [])
                 .where((n) => !_removedIds.contains(n['id']))
                 .toList();
-            return _HeaderIconButton(
+            return HeaderIconButton(
               icon: Icons.delete_sweep_rounded,
               tooltip: 'Clear all',
               onTap: items.isEmpty ? null : () => _clearAll(items),
@@ -293,13 +294,13 @@ class _NotificationPageState extends State<NotificationPage> {
       leadingWidth: 68,
       leading: Padding(
         padding: const EdgeInsets.only(left: 16),
-        child: _HeaderIconButton(icon: Icons.close_rounded, onTap: () => setState(_selected.clear)),
+        child: HeaderIconButton(icon: Icons.close_rounded, onTap: () => setState(_selected.clear)),
       ),
       title: Text('${_selected.length} selected'),
       centerTitle: false,
       titleSpacing: 0,
       actions: [
-        _HeaderIconButton(
+        HeaderIconButton(
           icon: Icons.delete_rounded,
           tooltip: 'Delete selected',
           iconColor: c.danger,
@@ -309,50 +310,6 @@ class _NotificationPageState extends State<NotificationPage> {
         const SizedBox(width: 16),
       ],
     );
-  }
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onTap;
-  final String? tooltip;
-  final Color? iconColor;
-  final Color? bgColor;
-
-  const _HeaderIconButton({
-    required this.icon,
-    required this.onTap,
-    this.tooltip,
-    this.iconColor,
-    this.bgColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    final disabled = onTap == null;
-    final button = Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        color: disabled ? c.surfaceAlt : (bgColor ?? c.surface),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: c.border),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(13),
-          onTap: onTap,
-          child: Icon(
-            icon,
-            size: 20,
-            color: disabled ? c.textMuted.withValues(alpha: .4) : (iconColor ?? c.textMuted),
-          ),
-        ),
-      ),
-    );
-    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 

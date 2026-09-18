@@ -8,6 +8,7 @@ import 'package:hisabshare/screens/list.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hisabshare/providers/contacts_provider.dart';
 import 'package:hisabshare/theme/app_theme.dart';
+import 'package:hisabshare/widgets/header_icon_button.dart';
 
 class DetailPage extends StatefulWidget {
   final String categoryId;
@@ -69,7 +70,6 @@ class _DetailPageState extends State<DetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.appColors;
     final persons = context.watch<ContactsProvider>().contactsFor(widget.categoryId);
     final searchText = searchController.text.toLowerCase();
     final filteredPersons = searchText.isEmpty
@@ -81,11 +81,12 @@ class _DetailPageState extends State<DetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.categoryName),
+        centerTitle: false,
         actions: [
-          IconButton(
+          HeaderIconButton(
             tooltip: 'Contact list / export',
-            icon: const Icon(Icons.list_alt_rounded),
-            onPressed: () {
+            icon: Icons.list_alt_rounded,
+            onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -97,6 +98,7 @@ class _DetailPageState extends State<DetailPage> {
               );
             },
           ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Padding(
@@ -124,10 +126,9 @@ class _DetailPageState extends State<DetailPage> {
                   ? _EmptyState(hasQuery: searchText.isNotEmpty)
                   : RefreshIndicator(
                       onRefresh: _loadContacts,
-                      child: ListView.separated(
+                      child: ListView.builder(
                         padding: const EdgeInsets.only(top: 8, bottom: 96),
                         itemCount: filteredPersons.length,
-                        separatorBuilder: (_, __) => Divider(height: 1, color: c.border),
                         itemBuilder: (context, index) {
                           final person = filteredPersons[index];
                           return _ContactRow(
@@ -259,71 +260,83 @@ class _ContactRow extends StatelessWidget {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     final avatarColor = person['color'] as Color? ?? c.accentSoft;
 
-    return InkWell(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            CircleAvatar(radius: 22, backgroundColor: avatarColor, child: Text(initial, style: const TextStyle(fontWeight: FontWeight.w700))),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5)),
-                  const SizedBox(height: 2),
-                  Text(
-                    isPositive ? 'Apko Milenge' : 'Apko Dene Hain',
-                    style: TextStyle(fontSize: 12.5, color: c.textMuted),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                CircleAvatar(radius: 22, backgroundColor: avatarColor, child: Text(initial, style: const TextStyle(fontWeight: FontWeight.w700))),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5)),
+                      const SizedBox(height: 2),
+                      Text(
+                        isPositive ? 'Apko Milenge' : 'Apko Dene Hain',
+                        style: TextStyle(fontSize: 12.5, color: c.textMuted),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            if (sharedUser != null) ...[
-              GestureDetector(
-                onTap: () async {
-                  final result = await showDialog(
-                    context: context,
-                    builder: (context) => SharedUserInfoBottomSheet(
-                      contactId: person['id'],
-                      sharedUser: sharedUser,
-                    ),
-                  );
-                  if (!context.mounted) return;
-                  if (result == "removed") {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Access removed successfully.")),
-                    );
-                  } else if (result == "failed") {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Failed to remove access.")),
-                    );
-                  }
-                },
-                child: CircleAvatar(
-                  radius: 13,
-                  backgroundColor: c.surfaceAlt,
-                  backgroundImage: (sharedUser['imageUrl'] != null && sharedUser['imageUrl'].toString().isNotEmpty)
-                      ? CachedNetworkImageProvider(sharedUser['imageUrl'] as String)
-                      : null,
-                  child: (sharedUser['imageUrl'] == null || sharedUser['imageUrl'].toString().isEmpty)
-                      ? Icon(Icons.person, size: 14, color: c.textMuted)
-                      : null,
                 ),
-              ),
-              const SizedBox(width: 10),
-            ],
-            Text(
-              'Rs ${amount.abs().toStringAsFixed(0)}',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: isPositive ? c.accentStrong : c.danger,
-              ),
+                if (sharedUser != null) ...[
+                  GestureDetector(
+                    onTap: () async {
+                      final result = await showDialog(
+                        context: context,
+                        builder: (context) => SharedUserInfoBottomSheet(
+                          contactId: person['id'],
+                          sharedUser: sharedUser,
+                        ),
+                      );
+                      if (!context.mounted) return;
+                      if (result == "removed") {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Access removed successfully.")),
+                        );
+                      } else if (result == "failed") {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Failed to remove access.")),
+                        );
+                      }
+                    },
+                    child: CircleAvatar(
+                      radius: 13,
+                      backgroundColor: c.surfaceAlt,
+                      backgroundImage: (sharedUser['imageUrl'] != null && sharedUser['imageUrl'].toString().isNotEmpty)
+                          ? CachedNetworkImageProvider(sharedUser['imageUrl'] as String)
+                          : null,
+                      child: (sharedUser['imageUrl'] == null || sharedUser['imageUrl'].toString().isEmpty)
+                          ? Icon(Icons.person, size: 14, color: c.textMuted)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Text(
+                  'Rs ${amount.abs().toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: isPositive ? c.accentStrong : c.danger,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
