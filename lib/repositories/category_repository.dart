@@ -61,11 +61,20 @@ class CategoryRepository {
     );
   }
 
+  // Shared by any calls that overlap in time so only one of them actually
+  // seeds the default categories - two concurrent callers both seeing an
+  // empty list used to each POST their own batch and double every category.
+  static Future<List<CategoryModel>>? _inFlight;
+
   /// Loads the user's categories, seeding the default set on first run
   /// (mirrors the old Firestore "seed if empty" behavior). The API already
   /// orders results `is_default desc, position asc`, so no client-side
   /// re-sort is needed.
-  static Future<List<CategoryModel>> loadOrInitializeCategories() async {
+  static Future<List<CategoryModel>> loadOrInitializeCategories() {
+    return _inFlight ??= _loadOrInitialize().whenComplete(() => _inFlight = null);
+  }
+
+  static Future<List<CategoryModel>> _loadOrInitialize() async {
     List<CategoryModel> categories;
     try {
       categories = await _fetchCategories();
