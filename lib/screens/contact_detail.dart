@@ -8,6 +8,7 @@ import 'package:hisabshare/services/api_client.dart';
 import 'package:hisabshare/services/statement_export_service.dart';
 import 'package:hisabshare/services/transaction_service.dart';
 import 'package:hisabshare/theme/app_theme.dart';
+import 'package:hisabshare/widgets/transaction_type_choice.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
@@ -221,6 +222,7 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
         date: transaction['date'] as DateTime,
         type: transaction['type'] as String,
         credit: (transaction['credit'] as num).toDouble(),
+        note: (transaction['note'] as String?)?.trim().isEmpty ?? true ? null : transaction['note'] as String,
       );
       _startStream();
     } catch (e) {
@@ -301,84 +303,135 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
   }
 
   void _showAddTransactionDialog() {
-    final c = context.appColors;
     DateTime selectedTxDate = DateTime.now();
-    String selectedType = 'Send';
-    final creditController = TextEditingController();
+    String selectedType = 'Receive';
+    final amountController = TextEditingController();
+    final noteController = TextEditingController();
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) {
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return AlertDialog(
-              title: const Text("Add Transaction"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                        "Date: ${selectedTxDate.day}/${selectedTxDate.month}/${selectedTxDate.year}"),
-                    trailing: const Icon(Icons.calendar_today),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedTxDate,
-                        firstDate: DateTime(2023),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setStateDialog(() {
-                          selectedTxDate = picked;
-                        });
-                      }
-                    },
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+          builder: (sheetContext, setStateSheet) {
+            final c = sheetContext.appColors;
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ChoiceChip(
-                        label: const Text("Send"),
-                        selected: selectedType == "Send",
-                        onSelected: (_) => setStateDialog(() => selectedType = "Send"),
-                        selectedColor: c.dangerSoft,
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(color: c.border, borderRadius: BorderRadius.circular(2)),
+                        ),
                       ),
-                      const SizedBox(width: 10),
-                      ChoiceChip(
-                        label: const Text("Receive"),
-                        selected: selectedType == "Receive",
-                        onSelected: (_) => setStateDialog(() => selectedType = "Receive"),
-                        selectedColor: c.accentSoft,
+                      Text('Add Transaction', style: Theme.of(sheetContext).textTheme.headlineSmall),
+                      const SizedBox(height: 4),
+                      Text(
+                        'With ${widget.contactName}',
+                        style: TextStyle(color: c.textMuted, fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TransactionTypeChoice(
+                              label: 'Mila',
+                              subtitle: 'Aapko paisay mile',
+                              icon: Icons.call_received_rounded,
+                              selected: selectedType == 'Receive',
+                              color: c.accentStrong,
+                              bg: c.accentSoft,
+                              onTap: () => setStateSheet(() => selectedType = 'Receive'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TransactionTypeChoice(
+                              label: 'Diya',
+                              subtitle: 'Aapne paisay diye',
+                              icon: Icons.call_made_rounded,
+                              selected: selectedType == 'Send',
+                              color: c.danger,
+                              bg: c.dangerSoft,
+                              onTap: () => setStateSheet(() => selectedType = 'Send'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Amount', style: TextStyle(fontWeight: FontWeight.w600, color: c.textColor)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(hintText: '0', prefixText: 'Rs '),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Date', style: TextStyle(fontWeight: FontWeight.w600, color: c.textColor)),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: sheetContext,
+                            initialDate: selectedTxDate,
+                            firstDate: DateTime(2023),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) setStateSheet(() => selectedTxDate = picked);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: c.border),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.calendar_today_rounded, size: 18, color: c.textMuted),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${selectedTxDate.year}-${selectedTxDate.month.toString().padLeft(2, '0')}-${selectedTxDate.day.toString().padLeft(2, '0')}',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Note (optional)', style: TextStyle(fontWeight: FontWeight.w600, color: c.textColor)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: noteController,
+                        decoration: const InputDecoration(hintText: 'Add a note'),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            _addTransaction({
+                              'date': selectedTxDate,
+                              'type': selectedType,
+                              'credit': double.tryParse(amountController.text) ?? 0.0,
+                              'note': noteController.text,
+                            });
+                          },
+                          child: const Text('Save transaction'),
+                        ),
                       ),
                     ],
                   ),
-                  TextField(
-                    controller: creditController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "Credit"),
-                  )
-                ],
+                ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel"),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _addTransaction({
-                      'date': selectedTxDate,
-                      'type': selectedType,
-                      'credit': double.tryParse(creditController.text) ?? 0.0,
-                    });
-                    _noteController.clear();
-                    setState(() {});
-                  },
-                  child: const Text("Save"),
-                ),
-              ],
             );
           },
         );

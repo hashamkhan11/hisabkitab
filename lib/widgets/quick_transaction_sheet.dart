@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hisabshare/models/model.dart';
 import 'package:hisabshare/services/transaction_service.dart';
 import 'package:hisabshare/theme/app_theme.dart';
+import 'package:hisabshare/widgets/transaction_type_choice.dart';
 
 /// Two-step "quick transaction" flow opened from the home FAB: pick a
 /// contact (across every category), then fill in the transaction itself.
@@ -204,9 +205,10 @@ class _QuickTransactionSheetState extends State<QuickTransactionSheet> {
           Row(
             children: [
               Expanded(
-                child: _TypeChoice(
-                  label: 'Receive',
-                  icon: Icons.south_west_rounded,
+                child: TransactionTypeChoice(
+                  label: 'Mila',
+                  subtitle: 'Aapko paisay mile',
+                  icon: Icons.call_received_rounded,
                   selected: _type == 'Receive',
                   color: c.accentStrong,
                   bg: c.accentSoft,
@@ -215,9 +217,10 @@ class _QuickTransactionSheetState extends State<QuickTransactionSheet> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _TypeChoice(
-                  label: 'Send',
-                  icon: Icons.north_east_rounded,
+                child: TransactionTypeChoice(
+                  label: 'Diya',
+                  subtitle: 'Aapne paisay diye',
+                  icon: Icons.call_made_rounded,
                   selected: _type == 'Send',
                   color: c.danger,
                   bg: c.dangerSoft,
@@ -326,51 +329,3 @@ class _ContactPickerTile extends StatelessWidget {
   }
 }
 
-class _TypeChoice extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final Color color;
-  final Color bg;
-  final VoidCallback onTap;
-
-  const _TypeChoice({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.color,
-    required this.bg,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? bg : c.surfaceAlt,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? color : c.border, width: selected ? 1.5 : 1),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: selected ? color : c.textMuted),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? color : c.textMuted,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
