@@ -775,7 +775,7 @@ class _TransactionRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(isReceive ? 'Receive' : 'Send', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(isReceive ? 'Mila' : 'Diya', style: const TextStyle(fontWeight: FontWeight.w600)),
                     if (isRejected) ...[
                       const SizedBox(width: 6),
                       Text('· rejected', style: TextStyle(color: c.danger, fontSize: 12)),

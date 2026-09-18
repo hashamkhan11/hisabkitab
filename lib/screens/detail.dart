@@ -105,9 +105,9 @@ class _DetailPageState extends State<DetailPage> {
           children: [
             Row(
               children: [
-                Expanded(child: _SummaryChip(label: 'To receive', amount: totalReceive, positive: true)),
+                Expanded(child: _SummaryChip(label: 'Apko Milenge', amount: totalReceive, positive: true)),
                 const SizedBox(width: 12),
-                Expanded(child: _SummaryChip(label: 'To pay', amount: totalSend, positive: false)),
+                Expanded(child: _SummaryChip(label: 'Apko Dene Hain', amount: totalSend, positive: false)),
               ],
             ),
             const SizedBox(height: 16),
@@ -275,7 +275,7 @@ class _ContactRow extends StatelessWidget {
                   Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5)),
                   const SizedBox(height: 2),
                   Text(
-                    isPositive ? 'To receive' : 'To pay',
+                    isPositive ? 'Apko Milenge' : 'Apko Dene Hain',
                     style: TextStyle(fontSize: 12.5, color: c.textMuted),
                   ),
                 ],
