@@ -197,7 +197,11 @@ class _SummaryChip extends StatelessWidget {
     final bg = positive ? c.accentSoft : c.dangerSoft;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: .3)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

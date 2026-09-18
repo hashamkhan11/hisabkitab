@@ -588,6 +588,7 @@ class _HeroBalanceCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [c.accent, c.accentStrong],
         ),
+        border: Border.all(color: c.onAccent.withValues(alpha: .22)),
         boxShadow: [
           BoxShadow(color: c.accent.withValues(alpha: .35), blurRadius: 24, offset: const Offset(0, 10)),
         ],
@@ -704,6 +705,7 @@ class _StatChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: onAccent.withValues(alpha: .16),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: onAccent.withValues(alpha: .28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
