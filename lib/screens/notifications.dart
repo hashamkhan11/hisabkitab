@@ -159,14 +159,32 @@ class _NotificationPageState extends State<NotificationPage> {
 
           if (items.isEmpty) {
             return Center(
-              child: Text(
-                'No notifications yet!',
-                style: TextStyle(fontSize: 16, color: c.textMuted),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(color: c.accentSoft, shape: BoxShape.circle),
+                    child: Icon(Icons.notifications_none_rounded, size: 34, color: c.accentStrong),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'No notifications yet',
+                    style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: c.textColor),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "You're all caught up",
+                    style: TextStyle(fontSize: 13, color: c.textMuted),
+                  ),
+                ],
               ),
             );
           }
 
           return ListView.builder(
+            padding: const EdgeInsets.only(top: 4, bottom: 16),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final rawData = items[index];
@@ -178,12 +196,12 @@ class _NotificationPageState extends State<NotificationPage> {
                 key: ValueKey(id),
                 direction: _selectionMode ? DismissDirection.none : DismissDirection.endToStart,
                 background: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
                   alignment: Alignment.centerRight,
                   decoration: BoxDecoration(
                     color: c.danger,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Icon(Icons.delete_rounded, color: c.onAccent),
                 ),
@@ -237,53 +255,104 @@ class _NotificationPageState extends State<NotificationPage> {
 
   AppBar _buildDefaultAppBar() {
     return AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: widget.onBackToHome,
+      leadingWidth: 68,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: _HeaderIconButton(icon: Icons.arrow_back_rounded, onTap: widget.onBackToHome),
       ),
       title: const Text('Notifications'),
-      centerTitle: true,
+      centerTitle: false,
+      titleSpacing: 0,
       actions: [
-        IconButton(
+        _HeaderIconButton(
+          icon: Icons.done_all_rounded,
           tooltip: 'Mark all as read',
-          icon: const Icon(Icons.done_all_rounded),
-          onPressed: () async {
-            await NotificationRepository.markAllRead();
-          },
+          onTap: () async => NotificationRepository.markAllRead(),
         ),
+        const SizedBox(width: 8),
         StreamBuilder<List<Map<String, dynamic>>>(
           stream: NotificationRepository.notificationsStream(),
           builder: (context, snapshot) {
             final items = (snapshot.data ?? [])
                 .where((n) => !_removedIds.contains(n['id']))
                 .toList();
-            return IconButton(
+            return _HeaderIconButton(
+              icon: Icons.delete_sweep_rounded,
               tooltip: 'Clear all',
-              icon: const Icon(Icons.delete_sweep_rounded),
-              onPressed: items.isEmpty ? null : () => _clearAll(items),
+              onTap: items.isEmpty ? null : () => _clearAll(items),
             );
           },
         ),
+        const SizedBox(width: 16),
       ],
     );
   }
 
   AppBar _buildSelectionAppBar(AppColors c) {
     return AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.close_rounded),
-        onPressed: () => setState(_selected.clear),
+      leadingWidth: 68,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: _HeaderIconButton(icon: Icons.close_rounded, onTap: () => setState(_selected.clear)),
       ),
       title: Text('${_selected.length} selected'),
       centerTitle: false,
+      titleSpacing: 0,
       actions: [
-        IconButton(
+        _HeaderIconButton(
+          icon: Icons.delete_rounded,
           tooltip: 'Delete selected',
-          icon: Icon(Icons.delete_rounded, color: c.danger),
-          onPressed: _deleteSelected,
+          iconColor: c.danger,
+          bgColor: c.dangerSoft,
+          onTap: _deleteSelected,
         ),
+        const SizedBox(width: 16),
       ],
     );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String? tooltip;
+  final Color? iconColor;
+  final Color? bgColor;
+
+  const _HeaderIconButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+    this.iconColor,
+    this.bgColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final disabled = onTap == null;
+    final button = Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: disabled ? c.surfaceAlt : (bgColor ?? c.surface),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: c.border),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(13),
+          onTap: onTap,
+          child: Icon(
+            icon,
+            size: 20,
+            color: disabled ? c.textMuted.withValues(alpha: .4) : (iconColor ?? c.textMuted),
+          ),
+        ),
+      ),
+    );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 
@@ -318,49 +387,82 @@ class _NotificationCard extends StatelessWidget {
         ? DateFormat('MMM d, yyyy • hh:mm a').format(DateTime.parse(createdAt))
         : '';
     final isRead = data['is_read'] == true;
+    final isRejected = data['status'] == 'rejected';
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 0,
-      color: selected ? c.accentSoft : (isRead ? c.surface : c.accentSoft),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: selected ? c.accentStrong : c.border, width: selected ? 1.5 : 1),
+    final iconBg = selectionMode
+        ? (selected ? c.accentSoft : c.surfaceAlt)
+        : (isRejected ? c.dangerSoft : c.accentSoft);
+    final iconColor = selectionMode
+        ? (selected ? c.accentStrong : c.textMuted)
+        : (isRejected ? c.danger : (isRead ? c.textMuted : c.accentStrong));
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: selected ? c.accentSoft : c.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: selected ? c.accentStrong : c.border, width: selected ? 1.5 : 1),
       ),
-      child: ListTile(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        leading: selectionMode
-            ? Icon(
-                selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                color: selected ? c.accentStrong : c.textMuted,
-                size: 28,
-              )
-            : Icon(
-                Icons.notifications_rounded,
-                color: data['status'] == 'rejected'
-                    ? c.danger
-                    : (isRead ? c.textMuted : c.accentStrong),
-                size: 28,
-              ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-            color: c.textColor,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(13)),
+                  child: Icon(
+                    selectionMode
+                        ? (selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded)
+                        : Icons.notifications_rounded,
+                    color: iconColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontWeight: isRead ? FontWeight.w600 : FontWeight.w700,
+                          fontSize: 14.5,
+                          color: c.textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        body,
+                        style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.3),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(time, style: TextStyle(fontSize: 11.5, color: c.textMuted)),
+                      if (!selectionMode && data['type'] == 'transaction_request') ...[
+                        const SizedBox(height: 8),
+                        _buildRequestFooter(c),
+                      ],
+                    ],
+                  ),
+                ),
+                if (!selectionMode && !isRead)
+                  Container(
+                    width: 9,
+                    height: 9,
+                    margin: const EdgeInsets.only(top: 4),
+                    decoration: BoxDecoration(color: c.accentStrong, shape: BoxShape.circle),
+                  ),
+              ],
+            ),
           ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(body, style: TextStyle(color: c.textColor.withValues(alpha: 0.8))),
-            const SizedBox(height: 4),
-            Text(time, style: TextStyle(fontSize: 12, color: c.textMuted)),
-            if (!selectionMode && data['type'] == 'transaction_request') ...[
-              const SizedBox(height: 4),
-              _buildRequestFooter(c),
-            ],
-          ],
         ),
       ),
     );
@@ -369,7 +471,6 @@ class _NotificationCard extends StatelessWidget {
   Widget _buildRequestFooter(AppColors c) {
     if (isProcessing) {
       return Row(
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
           SizedBox(
             width: 14,
@@ -391,17 +492,40 @@ class _NotificationCard extends StatelessWidget {
     }
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        TextButton(
-          onPressed: onAccept,
-          child: Text("Accept", style: TextStyle(color: c.accentStrong)),
-        ),
-        TextButton(
-          onPressed: onReject,
-          child: Text("Reject", style: TextStyle(color: c.danger)),
-        ),
+        Expanded(child: _RequestActionButton(label: 'Accept', color: c.accentStrong, bg: c.accentSoft, onPressed: onAccept)),
+        const SizedBox(width: 8),
+        Expanded(child: _RequestActionButton(label: 'Reject', color: c.danger, bg: c.dangerSoft, onPressed: onReject)),
       ],
+    );
+  }
+}
+
+class _RequestActionButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color bg;
+  final VoidCallback onPressed;
+
+  const _RequestActionButton({required this.label, required this.color, required this.bg, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12.5),
+          ),
+        ),
+      ),
     );
   }
 }
