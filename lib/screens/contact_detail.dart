@@ -136,8 +136,8 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Ledger saved successfully, login to your app to see the details."),
-              duration: Duration(seconds: 4),
+              content: Text("Ledger saved to your categories."),
+              duration: Duration(seconds: 3),
             ),
           );
         }
@@ -522,6 +522,20 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
       controller: _screenshotController,
       child: Scaffold(
         appBar: AppBar(
+          // A ledger-invite link can still land here as the only page on
+          // the stack (e.g. a route defined elsewhere without Home
+          // underneath it), which leaves no way back by default. Fall back
+          // to a Home button in that case instead of showing no way out.
+          leading: Navigator.of(context).canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.home_rounded),
+                  tooltip: 'Home',
+                  onPressed: () => context.go('/'),
+                ),
           actions: [
             IconButton(
               icon: const Icon(Icons.picture_as_pdf_outlined),
