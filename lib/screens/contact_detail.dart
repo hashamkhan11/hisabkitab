@@ -621,7 +621,7 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          positive ? "They'll pay you" : "You owe them",
+                          positive ? "Apko Milenge" : "Apko Dene Hain",
                           style: TextStyle(color: c.onAccent, fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                       ),
