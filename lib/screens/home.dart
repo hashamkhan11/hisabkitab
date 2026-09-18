@@ -20,14 +20,7 @@ import 'package:hisabshare/repositories/notification_repository.dart';
 import 'package:hisabshare/providers/current_user_provider.dart';
 
 class Homepage extends StatefulWidget {
-  final void Function(bool) onThemeToggle;
-  final bool isDarkMode;
-
-  const Homepage({
-    super.key,
-    required this.onThemeToggle,
-    required this.isDarkMode,
-  });
+  const Homepage({super.key});
 
   @override
   State<Homepage> createState() => _HomepageState();

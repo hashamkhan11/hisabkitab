@@ -34,7 +34,7 @@ class _AuthGate extends StatelessWidget {
         }
         final user = snapshot.data;
         if (user != null && user.emailVerified) {
-          return Homepage(onThemeToggle: (_) {}, isDarkMode: false);
+          return const Homepage();
         }
         return const HisabShareHomePage();
       },

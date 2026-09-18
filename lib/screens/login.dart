@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hisabshare/repositories/user_repository.dart';
 import 'package:hisabshare/screens/forgot_password.dart';
 import 'package:hisabshare/screens/signup.dart';
-import 'package:hisabshare/screens/home.dart';
 import 'package:hisabshare/theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -84,19 +83,16 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => Homepage(
-            onThemeToggle: (value) {},
-            isDarkMode: false,
-          ),
-        ),
-      );
-
+      // The root auth listener (_AuthGate in welcome.dart) already reacts to
+      // this sign-in on its own and swaps in the real Homepage - pushing a
+      // second, separately-constructed Homepage here used to leave two live
+      // copies on the stack at once (one hidden underneath), which is what
+      // was causing categories to be seeded twice on fresh accounts. Just
+      // pop back down to let the listener's copy show through.
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Successful!')),
       );
+      Navigator.popUntil(context, (route) => route.isFirst);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       const incorrectCredCodes = [

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hisabshare/repositories/contact_repository.dart';
 import 'package:hisabshare/screens/select_category.dart';
 import 'package:hisabshare/services/api_client.dart';
@@ -109,7 +110,7 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
       );
 
       if (shouldAccept != true) {
-        if (mounted) Navigator.of(context).pop();
+        if (mounted) _leaveShareFlow();
         return;
       }
 
@@ -141,10 +142,27 @@ class _ContactDetailPageState extends State<ContactDetailPage> {
         }
         _startStream();
       } else if (mounted) {
-        Navigator.of(context).pop();
+        _leaveShareFlow();
       }
     } catch (_) {
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open this ledger invite. It may have expired.')),
+        );
+        _leaveShareFlow();
+      }
+    }
+  }
+
+  /// Backs out of the pending-share flow. Reached both from a normal push
+  /// (something to pop back to) and from a cold-start deep link where this
+  /// page is the only thing on the stack - in that case popping would do
+  /// nothing and leave a blank screen, so fall back to the app's home route.
+  void _leaveShareFlow() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go('/');
     }
   }
 

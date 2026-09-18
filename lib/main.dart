@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -53,12 +54,25 @@ class MyApp extends StatelessWidget {
   final GoRouter _router = GoRouter(
     debugLogDiagnostics: true,
     initialLocation: '/',
+    // A cold start straight into a deep link (e.g. tapping a ledger-invite
+    // link before ever opening the app) lands here with no page underneath
+    // it and no signed-in/verified session. Rendering the destination
+    // directly in that state used to leave the screen unable to load its
+    // data and unable to pop anywhere, which showed up as a black screen.
+    // Bounce those cases through the normal auth-gated home route instead.
+    redirect: (context, state) {
+      final isContactRoute = state.matchedLocation.startsWith('/contact/');
+      if (!isContactRoute) return null;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null || !user.emailVerified) return '/';
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/',
         builder: (context, state) => HisabShareApp(),
       ),
-    
+
   GoRoute(
   path: '/contact/:contactId/:contactName',
   builder: (context, state) {

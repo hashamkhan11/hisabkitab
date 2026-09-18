@@ -74,7 +74,13 @@ class _SignupScreenState extends State<SignupScreen> {
         const SnackBar(content: Text('Verification email sent. Please verify your email before logging in.')),
       );
 
-      Navigator.pop(context);
+      // Registering signs the user in immediately (unverified), which the
+      // root auth listener picks up on its own and swaps to the "verify
+      // your email" screen. Popping straight to the root instead of just
+      // one level avoids leaving a stale Login screen on the stack above
+      // a tree the auth listener has already replaced underneath it, which
+      // was showing up as a black screen right after signup.
+      Navigator.popUntil(context, (route) => route.isFirst);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
