@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:hisabshare/models/model.dart';
@@ -10,6 +9,7 @@ import 'package:hisabshare/screens/notifications.dart';
 import 'package:hisabshare/screens/settings.dart';
 import 'package:hisabshare/services/transaction_service.dart';
 import 'package:hisabshare/theme/app_theme.dart';
+import 'package:hisabshare/widgets/app_header.dart';
 import 'package:hisabshare/widgets/hisaab.dart';
 import 'package:hisabshare/widgets/add_category.dart';
 import 'package:hisabshare/widgets/quick_transaction_sheet.dart';
@@ -246,6 +246,8 @@ class _HomepageState extends State<Homepage> {
           categories: taskList,
           onAddCategory: _addCategory,
           onDeleteCategory: _deleteCategory,
+          onOpenProfile: () => _goToTab(3),
+          onOpenNotifications: () => _goToTab(2),
         ),
         NotificationPage(onBackToHome: () => _goToTab(0)),
         SettingsPage(onBackToHome: () => _goToTab(0)),
@@ -403,7 +405,7 @@ class _DashboardTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
         children: [
-          _Header(onOpenProfile: onOpenProfile, onOpenNotifications: onOpenNotifications),
+          AppHeader(onOpenProfile: onOpenProfile, onOpenNotifications: onOpenNotifications),
           const SizedBox(height: 8),
           _HeroBalanceCard(),
           const SizedBox(height: 22),
@@ -569,72 +571,6 @@ class _RecentTxnRow extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  final VoidCallback onOpenProfile;
-  final VoidCallback onOpenNotifications;
-
-  const _Header({required this.onOpenProfile, required this.onOpenNotifications});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    return Row(
-      children: [
-        GestureDetector(
-          onTap: onOpenProfile,
-          child: Consumer<CurrentUserProvider>(
-            builder: (context, userProvider, _) {
-              final imageUrl = userProvider.user?['image_url'] as String?;
-              return CircleAvatar(
-                radius: 22,
-                backgroundColor: c.accentSoft,
-                backgroundImage: (imageUrl != null && imageUrl.isNotEmpty)
-                    ? CachedNetworkImageProvider(imageUrl) as ImageProvider
-                    : null,
-                child: (imageUrl == null || imageUrl.isEmpty)
-                    ? Icon(Icons.person_rounded, color: c.accentStrong)
-                    : null,
-              );
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Consumer<CurrentUserProvider>(
-            builder: (context, userProvider, _) {
-              final name = (userProvider.user?['username'] as String?)?.trim();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Welcome back', style: TextStyle(color: c.textMuted, fontSize: 12)),
-                  Text(
-                    (name == null || name.isEmpty) ? 'HisabShare' : name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-        GestureDetector(
-          onTap: onOpenNotifications,
-          child: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: c.surface,
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: c.border),
-            ),
-            child: Icon(Icons.notifications_rounded, color: c.textMuted, size: 20),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -981,42 +917,52 @@ class _CategoriesTab extends StatelessWidget {
   final List<CategoryModel> categories;
   final void Function(CategoryModel) onAddCategory;
   final void Function(CategoryModel) onDeleteCategory;
+  final VoidCallback onOpenProfile;
+  final VoidCallback onOpenNotifications;
 
   const _CategoriesTab({
     required this.isLoading,
     required this.categories,
     required this.onAddCategory,
     required this.onDeleteCategory,
+    required this.onOpenProfile,
+    required this.onOpenNotifications,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Categories'), automaticallyImplyLeading: false),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : categories.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No categories found',
-                          style: TextStyle(color: context.appColors.textMuted),
-                        ),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.only(bottom: 90),
-                        child: Categories(
-                          categoryList: categories,
-                          onAddCategory: onAddCategory,
-                          onDeleteCategory: onDeleteCategory,
-                        ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: AppHeader(onOpenProfile: onOpenProfile, onOpenNotifications: onOpenNotifications),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text('Categories', style: Theme.of(context).textTheme.titleMedium),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : categories.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No categories found',
+                        style: TextStyle(color: context.appColors.textMuted),
                       ),
-          ),
-        ],
-      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.only(bottom: 90),
+                      child: Categories(
+                        categoryList: categories,
+                        onAddCategory: onAddCategory,
+                        onDeleteCategory: onDeleteCategory,
+                      ),
+                    ),
+        ),
+      ],
     );
   }
 }
